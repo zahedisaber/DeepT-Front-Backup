@@ -7,6 +7,9 @@
    quick-start (no-signup), SPA routing (404.html redirect -> applyRouteForPath).
 
    INTEGRATION CONTRACTS (do not change without a matching backend change):
+     This branch (backup-site) points at the isolated backup.deept.ir
+     deployment's own backend/core, kept separate from production so this
+     site never touches real production data or load:
      CORE            -> https://core-backup.deept.ir  (auth/wallet/jobs/clients/invoices)
      BACKEND         -> https://backend-backup.deept.ir (translation + passport)
      X-Service-Secret -> INTERNAL_SERVICE_SECRET (service-to-service, BackEnd side)
@@ -14,6 +17,9 @@
 /* ============ CONFIGURATION & BACKEND ENDPOINTS ============ Core = auth/wallet/jobs/clients/invoices; BackEnd = translation + passport.
    QS_* point at a legacy quick-start server override; getActiveBackendOrigin()
    is the live switch. ============ */
+// const CORE    = 'http://127.0.0.1:8001';
+// const BACKEND = 'http://127.0.0.1:8000';
+
 const CORE    = 'https://core-backup.deept.ir';
 const BACKEND = 'https://backend-backup.deept.ir';
 
@@ -27,27 +33,37 @@ const BACKEND = 'https://backend-backup.deept.ir';
 //   usePassportSession → true means session_id is sent with the request
 // ═══════════════════════════════════════════════════════════
 const DOCUMENT_REGISTRY = {
+    'police-certificate': {
+        label:               'گواهی عدم سوء پیشینه',
+        endpoint: `${BACKEND}/api/translate/police-certificate`,
+        active:              true,
+        usePassportSession:  true,
+    },
     'vehicle-deed': {
         label:               'سند مالکیت خودرو (برگ سبز)',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/vehicle-deed',
+        endpoint: `${BACKEND}/api/translate/vehicle-deed`,
+        // Re-enabled after the BackEnd rework (DeepT-Back-End #71: eboo OCR
+        // for the Number / postal code / national ID, Gemini for the rest).
         active:              true,
         usePassportSession:  true,
     },
     'notary-deed': {
         label:               'اسناد دفترخانه (سند رسمی)',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/notary-deed',
+        endpoint: `${BACKEND}/api/translate/notary-deed`,
         active:              true,
         usePassportSession:  true,
     },
     'academic-transcript': {
         label:               'ریزنمرات علوم پزشکی',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/academic-transcript',
+        endpoint: `${BACKEND}/api/translate/academic-transcript`,
         active:              true,
         usePassportSession:  true,
+        courseCodesToggle:   true,   // shows the "نمایش کد دروس" checkbox, sends include_course_codes
+        chunkedUpload:       true,   // backend accepts upload_id as a fallback for large/flaky uploads
     },
     'gazette-notice': {
         label:               'آگهی تاسیس / تغییرات (روزنامه رسمی)',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/gazette-notice',
+        endpoint: `${BACKEND}/api/translate/gazette-notice`,
         active:              true,
         // Backend (gazette_notice.py) already accepts session_ids and
         // matches them against named individuals (board members, etc.)
@@ -58,41 +74,66 @@ const DOCUMENT_REGISTRY = {
     },
     'high-school-transcript': {
         label:               'ریزنمرات دبیرستان',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/high-school-transcript',
+        endpoint: `${BACKEND}/api/translate/high-school-transcript`,
         active:              true,
         usePassportSession:  true,
     },
     'ownership-deed': {
     label: 'سند مالکیت (تک برگ؛ نام مالک اول)',
-    endpoint: 'https://backend-backup.deept.ir/api/translate/ownership-deed',
+    endpoint: `${BACKEND}/api/translate/ownership-deed`,
     active: true,
     usePassportSession: true,
     },
     'azad-transcript': {
         label:               'ریزنمرات دانشگاه آزاد اسلامی',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/azad-transcript',
+        endpoint: `${BACKEND}/api/translate/azad-transcript`,
         active:              true,
         usePassportSession:  true,
     },
+    'general-transcript': {
+        label:               'ریزنمرات سیستم گلستان',
+        endpoint: `${BACKEND}/api/translate/general-transcript`,
+        active:              true,
+        usePassportSession:  true,
+        courseCodesToggle:   true,
+        chunkedUpload:       true,
+    },
     'insurance-record': {
         label:               'سوابق کامل بیمه تامین اجتماعی',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/insurance-record',
+        endpoint: `${BACKEND}/api/translate/insurance-record`,
         active:              true,
         usePassportSession:  true,
     },
     'consolidated-insurance-record': {
         label:               'سوابق تلفیقی بیمه تامین اجتماعی',
-        endpoint: 'https://backend-backup.deept.ir/api/translate/consolidated-insurance-record',
+        endpoint: `${BACKEND}/api/translate/consolidated-insurance-record`,
         active:              true,
         usePassportSession:  true,
     },
-    'police-certificate': {
-    label:               'گواهی عدم سوء پیشینه',
-    endpoint:            'https://deept-back-end.onrender.com/api/translate/police-certificate',
-    // or your proxied domain, e.g. backend-backup.deept.ir/api/translate/police-certificate
-    active:              true,
-    usePassportSession:  true,
-},
+    'insurance-list-receipt': {
+        label:               'رسید بیمه شدگان لیست اینترنتی-تامین اجتماعی',
+        // Employer's monthly list: page-1 summary + employee wage table
+        // (see insurance_list_receipt.py on DeepT-Back-End). No passport
+        // matching on the backend -- usePassportSession only keeps the
+        // usual client link (client_id) in the request.
+        endpoint: `${BACKEND}/api/translate/insurance-list-receipt`,
+        active:              true,
+        usePassportSession:  true,
+    },
+    'building-permit': {
+        label:               'پروانه های ساختمانی',
+        endpoint: `${BACKEND}/api/translate/building-permit`,
+        active:              true,
+        usePassportSession:  true,
+    },
+    'national-id-card': {
+        label:               'کارت ملی',
+        // Text read by eboo OCR, not Gemini vision (see national_id_card.py
+        // on DeepT-Back-End). One file: front only, or a PDF of both sides.
+        endpoint: `${BACKEND}/api/translate/national-id-card`,
+        active:              true,
+        usePassportSession:  true,
+    },
 };
 
 // Populate the hidden native select (kept so every other part of the app
@@ -270,6 +311,45 @@ async function syncProfileFromServer() {
     } catch (e) { /* offline or Core unreachable -- keep the cached value, try again next load */ }
 }
 
+// ═══════════════════════════════════════════════════════════
+// SYSTEM ANNOUNCEMENT BANNER (پنل مدیریت → publishSystemAnnouncement())
+// ═══════════════════════════════════════════════════════════
+// Shows an admin-published alert at the top of every logged-in user's
+// dashboard (see announcements.py). Keyed by the announcement's own
+// created_at, not a plain "seen it" flag -- so dismissing one doesn't
+// hide a newer one published later in the same browser.
+async function loadSystemAnnouncement() {
+    if (!currentUserSession || !currentUserSession.token) return;
+    const banner = document.getElementById('systemAnnouncementBanner');
+    if (!banner) return;
+    try {
+        const res = await fetch(`${CORE}/announcements/active`, {
+            headers: { 'Authorization': `Bearer ${currentUserSession.token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.active) { banner.classList.add('hidden'); return; }
+        if (localStorage.getItem('deept_dismissed_announcement') === data.created_at) {
+            banner.classList.add('hidden');
+            return;
+        }
+        document.getElementById('systemAnnouncementText').textContent = data.message;
+        banner.dataset.createdAt = data.created_at;
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+    } catch (e) { /* offline or Core unreachable -- leave banner as it was */ }
+}
+
+function dismissSystemAnnouncement() {
+    const banner = document.getElementById('systemAnnouncementBanner');
+    if (!banner) return;
+    if (banner.dataset.createdAt) {
+        localStorage.setItem('deept_dismissed_announcement', banner.dataset.createdAt);
+    }
+    banner.classList.add('hidden');
+    banner.classList.remove('flex');
+}
+
 let currentUserSession = loadSession();
 let trackingProjectsDatabase = [];
 let resetPasswordToken = null; // carried from ?reset_token=... on page load through to handleResetPassword()
@@ -364,20 +444,13 @@ function syncUserSessionDOM() {
     const toggle = (id, hide) => { const el=document.getElementById(id); if(el) el.classList.toggle('hidden', hide); };
     toggle('authHeaderBtn',      loggedIn);
     toggle('mainHeroAuthCall',   loggedIn);
-    toggle('workspaceHeaderBtn', !loggedIn);
-    toggle('clientsHeaderBtn',   !loggedIn);
-    toggle('scheduleHeaderBtn',  !loggedIn);
-    toggle('settingsHeaderBtn',  !loggedIn);
-    toggle('priceListHeaderBtn', !loggedIn);
-    toggle('adminPanelHeaderBtn', !loggedIn || localStorage.getItem('deept_is_admin') !== '1');
+    toggle('logoutHeaderBtn',    !loggedIn);
     // HR clock in/out: office-only sub-users (see hr.py) -- an "individual"
     // account has no staff to punch in/out, so this stays hidden for it.
     const isOffice = loggedIn && currentUserSession.type === 'office';
-    toggle('hrClockHeaderBtn',  !isOffice);
-    toggle('logoutHeaderBtn',    !loggedIn);
-    // Side rail: same destinations/visibility as the header-bar pills
-    // above, just also shown/hidden here (see #sideRail in index.html).
-    toggle('sideRail',           !loggedIn);
+    // Nav destination buttons, now living inside the header-bar itself
+    // (see index.html) rather than a separate rail element.
+    toggle('railHomeBtn',        !loggedIn);
     toggle('railWorkspaceBtn',   !loggedIn);
     toggle('railClientsBtn',     !loggedIn);
     toggle('railScheduleBtn',    !loggedIn);
@@ -385,8 +458,12 @@ function syncUserSessionDOM() {
     toggle('railSettingsBtn',    !loggedIn);
     toggle('railAdminPanelBtn',  !loggedIn || localStorage.getItem('deept_is_admin') !== '1');
     toggle('railHrClockBtn',    !isOffice);
+    // صفحه نخست panel grid -- same admin/office gating as the rail buttons above.
+    toggle('homePanelAdmin',    !loggedIn || localStorage.getItem('deept_is_admin') !== '1');
+    toggle('homePanelHr',       !isOffice);
     const ub = document.getElementById('userBadge');
     if (ub) { ub.classList.toggle('hidden', !loggedIn); ub.style.display = loggedIn ? 'flex' : 'none'; }
+    toggle('headerWalletBadge', !loggedIn);
     if (loggedIn) {
         const displayName = currentUserSession.office || currentUserSession.username || currentUserSession.email || '؟';
         const l = displayName[0].toUpperCase();
@@ -396,6 +473,11 @@ function syncUserSessionDOM() {
         set('headerUserName',     displayName);
         set('profileDisplayName', displayName);
         set('profileEmailBadge',  currentUserSession.email || '');
+        // صفحه نخست's own read-only profile+wallet card -- same data,
+        // kept in sync alongside میز کار's copy above.
+        set('home-avatarLetter',       l);
+        set('home-profileDisplayName', displayName);
+        set('home-profileEmailBadge',  currentUserSession.email || '');
         const at = document.getElementById('accountTypeToggle');
         if (at) at.value = currentUserSession.type || 'individual';
         const pc = document.getElementById('profileContactInput');
@@ -403,8 +485,54 @@ function syncUserSessionDOM() {
         const on = document.getElementById('officeNameInput');
         if (on) on.value = currentUserSession.office || '';
         toggleProfileAccountType();
+        refreshWalletBalanceDisplay();
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// USER PROFILE PREVIEW (header userBadge click) -- a read-only glance at
+// the logged-in account's own profile (a translator or office using
+// DeepT), not that account's مشتریان. Full editing stays in میز کار's own
+// profile card; "ویرایش پروفایل" here just jumps there.
+// ═══════════════════════════════════════════════════════════
+function openUserProfilePreview(event) {
+    if (!currentUserSession) return;
+    // A click on userBadge bubbles to the document-level listener below
+    // (added so clicking anywhere outside the popover closes it) --
+    // without stopping it here, the same click that opens the popover
+    // would also immediately close it.
+    if (event) event.stopPropagation();
+
+    const popover = document.getElementById('userProfilePreviewModal');
+    if (!popover.classList.contains('hidden')) { closeUserProfilePreview(); return; }
+
+    const displayName = currentUserSession.office || currentUserSession.username || currentUserSession.email || '؟';
+    const isOffice = currentUserSession.type === 'office';
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('upp-avatar', displayName[0].toUpperCase());
+    set('upp-name', displayName);
+    set('upp-email', currentUserSession.email || '');
+    set('upp-type', isOffice ? 'دارالترجمه رسمی' : 'مترجم حقیقی');
+
+    const officeRow = document.getElementById('upp-office-row');
+    if (officeRow) officeRow.classList.toggle('hidden', !isOffice || !currentUserSession.office);
+    set('upp-office', currentUserSession.office || '');
+
+    const contactRow = document.getElementById('upp-contact-row');
+    if (contactRow) contactRow.classList.toggle('hidden', !currentUserSession.contact);
+    set('upp-contact', currentUserSession.contact || '');
+
+    popover.classList.remove('hidden');
+    refreshWalletBalanceDisplay();
+}
+function closeUserProfilePreview() {
+    document.getElementById('userProfilePreviewModal').classList.add('hidden');
+}
+// Click anywhere outside the popover (it's open: event.stopPropagation()
+// on both the badge and the popover itself keep this from ever seeing a
+// click meant for either) or Escape closes it.
+document.addEventListener('click', () => closeUserProfilePreview());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeUserProfilePreview(); });
 
 // ═══════════════════════════════════════════════════════════
 // LOGOUT
@@ -413,6 +541,7 @@ function confirmLogout()   { document.getElementById('logoutOverlay').classList.
 function closeLogoutConfirm() { document.getElementById('logoutOverlay').classList.add('hidden'); }
 function executeLogout() {
     currentUserSession = null;
+    lastKnownJobStatuses = {};
     localStorage.removeItem('deept_mock_user');
     localStorage.removeItem('deept_token');
     localStorage.removeItem('deept_user_id');
@@ -434,6 +563,9 @@ document.getElementById('logoutOverlay').addEventListener('click', function(e) {
 });
 document.getElementById('myplRepriceModal').addEventListener('click', function(e) {
     if (e.target === this) closeMyPriceListRepriceModal();
+});
+document.getElementById('editWorkRecordModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditWorkRecordModal();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -866,6 +998,10 @@ async function saveProfileConfiguration() {
 // ═══════════════════════════════════════════════════════════
 async function loadPreferences() {
     if (!currentUserSession) return;
+    // Client-side only (see isJobSoundEnabled()) -- set unconditionally,
+    // not inside the server fetch below, so it still reflects correctly
+    // even if that request fails.
+    document.getElementById('pref-job-sound-enabled').checked = isJobSoundEnabled();
     const token = getToken();
     try {
         const res = await fetch(`${CORE}/users/me/preferences`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -1002,6 +1138,80 @@ const DP_DOCS = [
           "کارورزی": "Internship",
       } },
     },
+    { id:"general_transcript", label:"ریزنمرات سیستم گلستان", full:true, fields:[
+        // Every fixed English text DeepT-Back-End's general_transcript.py
+        // prints -- keys and defaults must match its PHRASE_DEFAULTS exactly
+        // (generated from it). Saved as document_phrases["general_transcript"].
+        { key:"document_subtitle", label:"عنوان کارنامه (زیر نام دانشگاه)", kind:"simple", def:"Academic Transcript of Records" },
+        { key:"label_student_name", label:"برچسب نام دانشجو", kind:"simple", def:"Student Name" },
+        { key:"label_father_name", label:"برچسب نام پدر", kind:"simple", def:"Father's Name" },
+        { key:"label_date_of_birth", label:"برچسب تاریخ تولد", kind:"simple", def:"Date of Birth" },
+        { key:"label_national_id", label:"برچسب کد ملی", kind:"simple", def:"National ID" },
+        { key:"label_birth_certificate_number", label:"برچسب شماره شناسنامه", kind:"simple", def:"Birth Certificate Number" },
+        { key:"semester_word", label:"واژهٔ «نیمسال» در عنوان ترم", kind:"simple", def:"Semester" },
+        { key:"summer_semester", label:"ترم تابستان", kind:"simple", def:"Summer Semester" },
+        { key:"academic_year_word", label:"واژهٔ «سال تحصیلی» در عنوان ترم", kind:"simple", def:"Academic Year" },
+        { key:"status_academic_probation", label:"وضعیت «مشروط»", kind:"simple", def:"Academic Probation" },
+        { key:"note_prefix", label:"پیشوند توضیحات ترم", kind:"simple", def:"Note:" },
+        { key:"col_code", label:"ستون کد درس", kind:"simple", def:"Code" },
+        { key:"col_name", label:"ستون نام درس", kind:"simple", def:"Course Name" },
+        { key:"col_credits", label:"ستون واحد", kind:"simple", def:"Credit" },
+        { key:"col_score", label:"ستون نمره", kind:"simple", def:"Score" },
+        { key:"col_effect", label:"ستون اثر", kind:"simple", def:"Effect" },
+        { key:"stat_gpa", label:"معدل ترم", kind:"simple", def:"GPA" },
+        { key:"stat_attempted_credits", label:"واحد اخذ شده", kind:"simple", def:"Attempted Credits" },
+        { key:"stat_earned_credits", label:"واحد گذرانده", kind:"simple", def:"Earned Credits" },
+        { key:"stat_total_earned_credits", label:"گذرانده متوالی (کل)", kind:"simple", def:"Total Earned Credits" },
+        { key:"stat_cgpa", label:"معدل کل", kind:"simple", def:"CGPA" },
+        { key:"abbr_ann", label:"اختصار «اع ش» در ستون نمره", kind:"simple", def:"Ann" },
+        { key:"abbr_ann_meaning", label:"توضیح «اع ش» (اعلام شده)", kind:"simple", def:"Announced" },
+        { key:"abbr_ew", label:"اختصار «ح ا» در ستون نمره", kind:"simple", def:"EW" },
+        { key:"abbr_ew_meaning", label:"توضیح «ح ا» (حذف اضطراری)", kind:"simple", def:"Emergency Withdrawal" },
+        { key:"abbr_aw", label:"اختصار «ح م» در ستون نمره", kind:"simple", def:"AW" },
+        { key:"abbr_aw_meaning", label:"توضیح «ح م» (حذف آموزشی)", kind:"simple", def:"Academic Withdrawal" },
+        { key:"abbr_abw", label:"اختصار «اع ح» در ستون نمره", kind:"simple", def:"ABW" },
+        { key:"abbr_abw_meaning", label:"توضیح «اع ح» (اعلام شده در حذف آیین نامه)", kind:"simple", def:"Announced in Bylaw Withdrawal" },
+        { key:"abbr_ip", label:"اختصار «اد پ» در ستون نمره", kind:"simple", def:"IP" },
+        { key:"abbr_ip_meaning", label:"توضیح «اد پ» (ادامه پروژه)", kind:"simple", def:"In Progress" },
+        { key:"score_pass", label:"«قبول» در ستون نمره", kind:"simple", def:"Pass" },
+        { key:"degree_bachelor", label:"مقطع کارشناسی", kind:"simple", def:"Bachelor's Degree" },
+        { key:"degree_master", label:"مقطع کارشناسی ارشد", kind:"simple", def:"Master's Degree" },
+        { key:"degree_phd", label:"مقطع دکتری", kind:"simple", def:"PhD Degree" },
+        { key:"study_mode_tuition_free", label:"دوره روزانه", kind:"simple", def:"Tuition-Free" },
+        { key:"study_mode_tuition_based", label:"دوره شبانه", kind:"simple", def:"Tuition-Based" },
+        { key:"course_type_general", label:"نوع درس: عمومی", kind:"simple", def:"General" },
+        { key:"course_type_basic", label:"نوع درس: پایه", kind:"simple", def:"Basic" },
+        { key:"course_type_main", label:"نوع درس: اصلی", kind:"simple", def:"Main" },
+        { key:"course_type_specialized", label:"نوع درس: تخصصی", kind:"simple", def:"Specialized" },
+        { key:"course_type_optional", label:"نوع درس: اختیاری", kind:"simple", def:"Optional" },
+        { key:"course_type_internship", label:"نوع درس: کارآموزی", kind:"simple", def:"Internship" },
+        { key:"course_type_project", label:"نوع درس: پروژه", kind:"simple", def:"Project" },
+        { key:"course_type_elective", label:"نوع درس: انتخابی", kind:"simple", def:"Elective" },
+        { key:"course_type_practical", label:"نوع درس: عملی", kind:"simple", def:"Practical" },
+        { key:"title_course_type_table", label:"عنوان جدول وضعیت دروس گذرانده بر اساس نوع درس", kind:"simple", def:"Status of Passed Courses Based on Course Type" },
+        { key:"label_total_attempted_credits", label:"تعداد واحد اخذ شده تا کنون", kind:"simple", def:"Total Attempted Credits to Date" },
+        { key:"title_program_summary", label:"عنوان بخش خلاصه وضعیت تحصیلی", kind:"simple", def:"PROGRAM SUMMARY RECORD HIGHLIGHTS" },
+        { key:"label_student_cgpa", label:"معدل کل دانشجو", kind:"simple", def:"Student CGPA" },
+        { key:"label_university_cgpa", label:"معدل دانشگاه", kind:"simple", def:"University CGPA" },
+        { key:"label_faculty_cgpa", label:"معدل دانشکده", kind:"simple", def:"Faculty CGPA" },
+        { key:"label_major_cgpa", label:"معدل رشته", kind:"simple", def:"Major CGPA" },
+        { key:"grade_table_title", label:"عنوان جدول توضیح وضع نمرات", kind:"simple", def:"Grade Status Explanation" },
+        { key:"grade_col_numeric", label:"ستون نمره عددی", kind:"simple", def:"Numeric Grade" },
+        { key:"grade_col_letter", label:"ستون معادل حرفی", kind:"simple", def:"Letter Equivalent" },
+        { key:"title_additional_data", label:"عنوان بخش اطلاعات تکمیلی", kind:"simple", def:"ADDITIONAL TRANSCRIPT DATA" },
+        { key:"label_date_of_translation", label:"برچسب تاریخ ترجمه", kind:"simple", def:"Date of Translation" },
+    ],
+      // Course-name glossary for DeepT-Back-End's general_transcript.py --
+      // same renderTermGlossary() table as academic_transcript above. These
+      // are that file's DEFAULT_COURSE_NAME_GLOSSARY built-ins; a translator
+      // can override any of them or add new terms, saved as
+      // term_glossary["general_transcript"].
+      glossary: { defaults: {
+          "کارآموزی در عرصه": "Clinical Training",
+          "کارآموزی": "Internship",
+          "کارورزی": "Internship",
+      } },
+    },
     { id:"azad_transcript", label:"ریزنمرات دانشگاه آزاد", full:true, fields:[
         { key:"course_list_intro", label:"فهرست دروس و ریزنمرات نامبرده در طی دوره تحصیلی به شرح زیر می‌باشد.", kind:"simple", def:"The course list and transcript of records are displayed below." },
     ],
@@ -1029,6 +1239,24 @@ const DP_DOCS = [
     ]},
     { id:"high_school_transcript", label:"ریزنمرات دبیرستان", full:true, fields:[
         { key:"document_title", label:"عنوان مدرک", kind:"simple", def:"Score Report Sheet" },
+    ]},    // Keys/defaults must match national_id_card.py on DeepT-Back-End.
+    { id:"national_id_card", label:"کارت ملی", full:true, fields:[
+        { key:"emblem_line", label:"سطر آرم", kind:"simple", def:"IRI Emblem" },
+        { key:"country_line", label:"جمهوری اسلامی ایران", kind:"simple", def:"Islamic Republic of Iran" },
+        { key:"organization_line", label:"سازمان ثبت احوال کشور", kind:"simple", def:"National Organization for Civil Registration" },
+        { key:"title", label:"عنوان سند", kind:"simple", def:"National ID Card" },
+        { key:"photo_caption", label:"زیرنویس محل عکس", kind:"simple", def:"[Printed photo of the holder]" },
+        { key:"front_label", label:"عنوان روی کارت", kind:"simple", def:"Front" },
+        { key:"label_national_id", label:"شماره ملی", kind:"simple", def:"National ID number:" },
+        { key:"label_given_name", label:"نام", kind:"simple", def:"Given name:" },
+        { key:"label_surname", label:"نام خانوادگی", kind:"simple", def:"Surname:" },
+        { key:"label_date_of_birth", label:"تاریخ تولد", kind:"simple", def:"Date of birth:" },
+        { key:"label_father_name", label:"نام پدر", kind:"simple", def:"Father’s name:" },
+        { key:"label_expiration_date", label:"پایان اعتبار", kind:"simple", def:"Expiration date:" },
+        { key:"overleaf_label", label:"عنوان پشت کارت", kind:"simple", def:"Overleaf" },
+        { key:"label_serial", label:"سریال کارت", kind:"simple", def:"Serial No." },
+        { key:"overleaf_note_1", label:"اعلام تغییر نشانی به ثبت احوال الزام قانونی دارد.", kind:"simple", def:"The National Organization for Civil Registration MUST be informed about any change in the holder’s address" },
+        { key:"overleaf_note_2", label:"از یابنده تقاضا می‌شود کارت را به صندوق پست بیندازد.", kind:"simple", def:"The finder is requested to drop the same in a postbox" },
     ]},
 ];
 
@@ -2095,15 +2323,37 @@ async function refreshWalletBalanceDisplay() {
         });
         if (res.ok) {
             const data = await res.json();
-            document.getElementById('walletBalanceDisplay').textContent = data.balance_toman.toLocaleString();
+            const formatted = data.balance_toman.toLocaleString();
+            // All three copies (میز کار sidebar, header pill, صفحه نخست card)
+            // show the same balance -- keep them in lockstep from one fetch.
+            ['walletBalanceDisplay', 'headerWalletBalance', 'home-walletBalanceDisplay', 'upp-balance'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = formatted;
+            });
         }
     } catch (e) { /* leave last-known display value on transient network failure */ }
 }
-function submitSupportTicket() {
-    const text = document.getElementById('supportTicketMsg').value;
+async function submitSupportTicket() {
+    const textEl = document.getElementById('supportTicketMsg');
+    const text = textEl.value.trim();
     if (!text) return;
-    showToast('📩 پیام شما ثبت شد.');
-    document.getElementById('supportTicketMsg').value = '';
+    const token = getToken();
+    if (!token) { openAuthModal(); return; }
+    try {
+        const res = await fetch(`${CORE}/support/tickets`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
+        });
+        if (res.ok) {
+            textEl.value = '';
+            showToast('📩 پیام شما ثبت شد.');
+        } else {
+            showToast('❌ ارسال تیکت ناموفق بود. دوباره تلاش کنید.');
+        }
+    } catch (e) {
+        showToast('❌ ارسال تیکت ناموفق بود. اتصال خود را بررسی کنید.');
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2128,6 +2378,9 @@ async function openWorkspaceDashboard(pushHistory = true) {
     document.getElementById('workSchedulePage').classList.add('hidden');
     document.getElementById('settingsPage').classList.add('hidden');
     document.getElementById('myPriceListPage').classList.add('hidden');
+    document.getElementById('homePanelsPage').classList.add('hidden');
+    document.getElementById('dateConverterPage').classList.add('hidden');
+    document.getElementById('hrPage').classList.add('hidden');
 
     // Reserve exactly as much top space as the header actually needs,
     // measured live -- more reliable than a fixed padding guess, since it
@@ -2163,6 +2416,9 @@ async function openClientsWorkspace(pushHistory = true) {
     document.getElementById('workSchedulePage').classList.add('hidden');
     document.getElementById('settingsPage').classList.add('hidden');
     document.getElementById('myPriceListPage').classList.add('hidden');
+    document.getElementById('homePanelsPage').classList.add('hidden');
+    document.getElementById('dateConverterPage').classList.add('hidden');
+    document.getElementById('hrPage').classList.add('hidden');
 
     const headerEl = document.querySelector('.header-bar');
     if (headerEl) {
@@ -2170,7 +2426,7 @@ async function openClientsWorkspace(pushHistory = true) {
     }
 
     document.body.style.overflow = 'hidden';
-    renderDashboardClients();
+    renderDashboardClients('', true);
     if (pushHistory) navigateTo('/clients');
 }
 
@@ -2200,7 +2456,53 @@ function showLandingView() {
     if (st) st.classList.add('hidden');
     const pl = document.getElementById('myPriceListPage');
     if (pl) pl.classList.add('hidden');
+    const hp = document.getElementById('homePanelsPage');
+    if (hp) hp.classList.add('hidden');
+    const dc = document.getElementById('dateConverterPage');
+    if (dc) dc.classList.add('hidden');
+    const hrp = document.getElementById('hrPage');
+    if (hrp) hrp.classList.add('hidden');
     document.body.style.overflow = 'auto';
+}
+
+// صفحه نخست -- a round-corner grid of feature panels (میز کار, مشتریان,
+// برنامه کاری, نرخنامه, تنظیمات, + admin/HR for those accounts), distinct
+// from میز کار itself: a logged-in user's actual "home base" rather than
+// one more workspace tool. Lives at its own /home route so '/' keeps
+// defaulting straight to میز کار (applyRouteForPath's existing behavior).
+function openHomePanels(pushHistory = true) {
+    if (!currentUserSession) { openAuthModal(); return; }
+    showFullView('homePanelsPage');
+    if (pushHistory) navigateTo('/home');
+}
+
+// تبدیل تاریخ -- opened from its own card on صفحه نخست as a separate
+// module (same converter as the public landing page's #tool section, see
+// convertDate()/copyFmt() -- "h-" id prefix there).
+function openDateConverterPage(pushHistory = true) {
+    if (!currentUserSession) { openAuthModal(); return; }
+    showFullView('dateConverterPage');
+    if (pushHistory) navigateTo('/home/date-converter');
+}
+
+function closeDateConverterPage() {
+    document.getElementById('dateConverterPage').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+    openHomePanels(false);
+}
+
+// صفحه نخست -- the header-bar's own "home" nav button. This button is only
+// ever visible to a logged-in user (same toggle(id, !loggedIn) pattern as
+// every other nav icon), so there's no real scenario where the public
+// marketing/landing page is the right destination: open the panel grid
+// instead. showLandingView() stays the actual logged-out home.
+function goToHomePage(pushHistory = true) {
+    if (currentUserSession) {
+        openHomePanels(pushHistory);
+        return;
+    }
+    showLandingView();
+    if (pushHistory) navigateTo('/');
 }
 
 function closeWorkspaceDashboard(pushHistory = true) {
@@ -2210,6 +2512,69 @@ function closeWorkspaceDashboard(pushHistory = true) {
     if (pushHistory) navigateTo('/');
 }
 let allJobsTerminal = false;
+
+// ═══════════════════════════════════════════════════════════
+// JOB-COMPLETE NOTIFICATIONS -- a toast + short chime the moment a job's
+// status flips to "completed" during the 30s poll below, so the user
+// doesn't have to keep میز کار open and watch the table to notice. Only
+// fires for a transition observed live (lastKnownJobStatuses) -- a job
+// that was already completed before this page loaded never triggers one.
+// ═══════════════════════════════════════════════════════════
+let lastKnownJobStatuses = {};
+
+// Settings → "پخش صدا هنگام تکمیل ترجمه" toggle (see settingsPage) --
+// purely a client-side preference (localStorage), unlike the rest of
+// settingsPage's fields which round-trip through /users/me/preferences:
+// whether to play a sound has no meaning on another device, so it never
+// needs to sync. Defaults to enabled.
+function isJobSoundEnabled() {
+    return localStorage.getItem('deept_job_sound_enabled') !== '0';
+}
+function setJobSoundEnabled(enabled) {
+    localStorage.setItem('deept_job_sound_enabled', enabled ? '1' : '0');
+}
+
+function playJobCompleteChime() {
+    if (!isJobSoundEnabled()) return;
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // "Snappy double-tap": two quick bell taps, E5 then C5. Each strike
+        // is a fundamental plus inharmonic overtone partials (the
+        // non-integer ratios are what make it sound like a struck bell
+        // rather than a pure tone) with a short decay.
+        const strikeBell = (fundamental, startTime) => {
+            const partials = [
+                { ratio: 1,    gain: 0.35, decay: 1.32 },
+                { ratio: 2.01, gain: 0.18, decay: 1.02 },
+                { ratio: 3.0,  gain: 0.10, decay: 0.78 },
+                { ratio: 4.2,  gain: 0.07, decay: 0.60 },
+                { ratio: 5.4,  gain: 0.04, decay: 0.42 },
+            ];
+            partials.forEach(({ ratio, gain: g, decay }) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = fundamental * ratio;
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(g, startTime + 0.008);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startTime + decay);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + decay + 0.05);
+            });
+        };
+        const now = ctx.currentTime;
+        strikeBell(659.25, now);         // E5
+        strikeBell(523.25, now + 0.35);  // C5
+        setTimeout(() => ctx.close(), 2000);
+    } catch (e) { /* Web Audio unavailable/blocked -- the toast still shows */ }
+}
+
+function notifyJobCompleted(job) {
+    const typeLabel = DOCUMENT_REGISTRY[job.document_type]?.label || job.document_type;
+    showToast(`🎉 ترجمه «${typeLabel}» آماده شد!`, 4000);
+    playJobCompleteChime();
+}
 
 /* ============ SECTION: DASHBOARD — ACTIVE PROJECTS ============
    Renders the translation-jobs table (id: projectDashboardRowsBlock). ============ */
@@ -2228,11 +2593,15 @@ async function renderDashboardActiveProjects() {
         if (res.ok) jobs = await res.json();
     } catch (e) { /* keep whatever was last rendered on a transient failure */ }
 
+    const newlyCompleted = jobs.filter(j => j.status === 'completed' && lastKnownJobStatuses[j.id] && lastKnownJobStatuses[j.id] !== 'completed');
+    jobs.forEach(j => { lastKnownJobStatuses[j.id] = j.status; });
+    newlyCompleted.forEach(notifyJobCompleted);
+
     allJobsTerminal = jobs.length > 0 && jobs.every(j => j.status === 'completed' || j.status === 'failed');
 
     tbody.innerHTML = '';
     if (!jobs.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-sm" style="color:var(--text-muted);">// بدون پروژه فعال</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">// بدون پروژه فعال</td></tr>`;
         return;
     }
 
@@ -2257,6 +2626,14 @@ async function renderDashboardActiveProjects() {
             actionsHtml = `<span style="color:var(--text-muted);">در حال پردازش...</span>`;
         }
 
+        // Every page-priced document type sends this from Back-End (see
+        // count_pdf_pages()/core_client.create_job's page_count); a flat-fee
+        // type (e.g. police certificate) and every job predating this field
+        // have none -- shown as "—" rather than a misleading 0 or NaN.
+        const pageCountCell = job.page_count
+            ? job.page_count.toLocaleString()
+            : '<span style="color:var(--text-muted);">—</span>';
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td class="py-3 text-right">
@@ -2267,6 +2644,7 @@ async function renderDashboardActiveProjects() {
                 ${typeLabel}
                 <div class="text-[10px] font-normal" style="color:var(--text-muted);">${job.price_toman ? job.price_toman.toLocaleString() + ' تومان' : ''}</div>
             </td>
+            <td class="py-3 text-center font-bold" style="color:var(--text-main);" title="تعداد صفحات سند آپلودشده">${pageCountCell}</td>
             <td class="py-3 text-center" style="color:var(--text-muted);">${dateStr}</td>
             <td class="py-3 text-center"><span style="color:${st.color};font-weight:700;">${st.text}</span></td>
             <td class="py-3 text-left text-xs">${actionsHtml}</td>`;
@@ -2277,57 +2655,110 @@ async function renderDashboardActiveProjects() {
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD — MY CLIENTS
 // ═══════════════════════════════════════════════════════════
-let dashboardClientsDebounce = null;
-function searchDashboardClients(q) {
-    clearTimeout(dashboardClientsDebounce);
-    dashboardClientsDebounce = setTimeout(() => renderDashboardClients(q), 250);
+// Fetched once per visit to مشتریان (and refetched after any add/edit/
+// delete/Sanam-import -- see renderDashboardClients(q, forceRefresh)
+// callers below), then filtered locally on every keystroke: instant, and
+// matches substrings across every field (Farsi name, Latin name, phone,
+// national id) regardless of whatever subset the server's own ?q= filter
+// happens to cover.
+let dashboardClientsCache = null;
+
+function clientMatchesQuery(c, q) {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    const haystacks = [
+        c.first_name_fa, c.last_name_fa,
+        `${c.first_name_fa || ''} ${c.last_name_fa || ''}`,
+        c.first_name, c.last_name,
+        `${c.first_name || ''} ${c.last_name || ''}`,
+        c.national_id, c.phone,
+    ];
+    return haystacks.some(h => (h || '').toString().toLowerCase().includes(needle));
 }
 
-async function renderDashboardClients(q = '') {
+function searchDashboardClients(q) {
+    renderDashboardClients(q);
+}
+
+async function renderDashboardClients(q = '', forceRefresh = false) {
     const box = document.getElementById('dashboardClientsList');
     if (!box) return;
-    box.innerHTML = `<div class="text-xs text-center py-6" style="color:var(--text-muted);">در حال بارگذاری...</div>`;
     const token = localStorage.getItem('deept_token');
-    try {
-        const url = new URL(`${CORE}/clients`);
-        if (q) url.searchParams.set('q', q);
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!res.ok) throw new Error();
-        const clients = await res.json();
-        if (!clients.length) {
-            box.innerHTML = `<div class="text-xs text-center py-6" style="color:var(--text-muted);">// هنوز مشتری‌ای ثبت نشده</div>`;
+
+    if (dashboardClientsCache === null || forceRefresh) {
+        box.innerHTML = `<div class="text-xs text-center py-6" style="color:var(--text-muted);">در حال بارگذاری...</div>`;
+        try {
+            const res = await fetch(`${CORE}/clients`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error();
+            dashboardClientsCache = await res.json();
+        } catch (e) {
+            dashboardClientsCache = null;
+            box.innerHTML = `<div class="text-xs text-center py-6" style="color:#f87171;">خطا در دریافت لیست مشتریان.
+                <button onclick="renderDashboardClients('${(q || '').replace(/'/g,"")}', true)" class="block mx-auto mt-2 text-[11px] font-bold px-3 py-1 rounded-lg" style="background:var(--card-surface);color:var(--accent);border:1px solid var(--border-color);">🔄 تلاش مجدد</button>
+            </div>`;
             return;
         }
+    }
+
+    if (!dashboardClientsCache.length) {
+        box.innerHTML = `<div class="text-xs text-center py-6" style="color:var(--text-muted);">// هنوز مشتری‌ای ثبت نشده</div>`;
+        return;
+    }
+
+    const clients = dashboardClientsCache.filter(c => clientMatchesQuery(c, q));
+    if (!clients.length) {
+        box.innerHTML = `<div class="text-xs text-center py-6" style="color:var(--text-muted);">موردی یافت نشد.</div>`;
+        return;
+    }
+
+    {
         const faName = (c) => `${c.first_name_fa || ''} ${c.last_name_fa || ''}`.trim();
         const enName = (c) => `${c.first_name || ''} ${c.last_name || ''}`.trim();
         const displayName = (c) => faName(c) || enName(c) || '—';
+        // A real <table> instead of one independent CSS-grid <div> per row:
+        // separate grid containers each size their own fr columns off their
+        // own content, so a row with a longer/shorter name than the header's
+        // label text drifts the column boundaries out of alignment with it
+        // row by row. A <table> shares one column layout across the header
+        // and every row by construction, so this can't happen.
         box.innerHTML = `
-            <div class="grid grid-cols-[1.6fr_1fr_1fr_96px] items-center gap-3 px-3 py-2 text-[11px] font-black" style="color:var(--text-muted);border-bottom:1px solid var(--divider);">
-                <span>نام</span>
-                <span>کد ملی</span>
-                <span>شماره همراه</span>
-                <span></span>
-            </div>
-            ${clients.map(c => `
-                <div class="grid grid-cols-[1.6fr_1fr_1fr_96px] items-center gap-3 p-3 rounded-xl" style="background:var(--bg-main);border:1px solid var(--border-subtle);">
-                    <div>
-                        <div class="font-black text-sm" style="color:var(--text-main);">${escapeHtml(displayName(c))}</div>
-                        ${enName(c) && enName(c) !== displayName(c) ? `<div class="text-[11px] en" style="color:var(--text-muted);">${escapeHtml(enName(c))}</div>` : ''}
-                    </div>
-                    <div class="text-xs en font-bold" style="color:var(--text-main);" dir="ltr">${escapeHtml(c.national_id) || '—'}</div>
-                    <div class="text-xs en font-bold" style="color:var(--text-main);" dir="ltr">${escapeHtml(c.phone) || '—'}</div>
-                    <button onclick="openClientProfile('${c.id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg transition justify-self-end" style="background:var(--card-surface);color:var(--accent);border:1px solid var(--border-color);">مشاهده</button>
-                </div>
-            `).join('')}`;
-    } catch (e) {
-        box.innerHTML = `<div class="text-xs text-center py-6" style="color:#f87171;">خطا در دریافت لیست مشتریان.
-            <button onclick="renderDashboardClients('${(q || '').replace(/'/g,"")}')" class="block mx-auto mt-2 text-[11px] font-bold px-3 py-1 rounded-lg" style="background:var(--card-surface);color:var(--accent);border:1px solid var(--border-color);">🔄 تلاش مجدد</button>
-        </div>`;
+            <table class="ws-table" style="width:100%;border-spacing:0;font-size:.8rem;">
+                <thead>
+                    <tr>
+                        <th style="text-align:right;padding-inline-start:.75rem;">نام</th>
+                        <th style="text-align:right;">کد ملی</th>
+                        <th style="text-align:right;">شماره همراه</th>
+                        <th style="width:140px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${clients.map(c => `
+                        <tr>
+                            <td style="padding:.6rem .75rem .6rem 0;">
+                                <div class="font-black text-sm" style="color:var(--text-main);">${escapeHtml(displayName(c))}</div>
+                            </td>
+                            <td class="en font-bold" style="padding:.6rem 0;color:var(--text-main);text-align:right;" dir="ltr">${escapeHtml(c.national_id) || '—'}</td>
+                            <td class="en font-bold" style="padding:.6rem 0;color:var(--text-main);text-align:right;" dir="ltr">${escapeHtml(c.phone) || '—'}</td>
+                            <td style="padding:.6rem 0;">
+                                <span class="flex items-center gap-1.5 justify-end">
+                                    <button onclick="openClientProfile('${c.id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg transition" style="background:var(--card-surface);color:var(--accent);border:1px solid var(--border-color);">مشاهده</button>
+                                    <button onclick="deleteClient('${c.id}')" title="حذف مشتری" class="text-xs font-bold px-2 py-1.5 rounded-lg transition" style="background:var(--card-surface);color:#f87171;border:1px solid var(--border-color);">🗑</button>
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
     }
 }
 
 let currentClientDetailId = null;
 let invoiceDraft = [];   // [{description, quantity, line_total_toman, job_id}] -- built up before POSTing to /invoices
+// The activity list's own computed rows from the last render -- lets the
+// bulk action bar (create invoice / delete / edit fields) below look up a
+// checked row's current type/title/price without a second fetch.
+let lastActivityRows = [];
+let editWorkRecordTarget = null;   // { type, id } while editWorkRecordModal is open
 
 /* ============ SECTION: CLIENT DETAIL + DRAFT INVOICE ============
    Related persons, jobs list, notes, and the draft-invoice builder. ============ */
@@ -2405,17 +2836,198 @@ function toggleActivityInDraft(type, id, description, priceToman, checked) {
     const key = activityRowKey(type, id);
     if (checked) {
         if (isActivityInDraft(key)) return;
-        // job_id is only ever set for a real DeepT job -- a Sanam-sourced
-        // row is a fresh draft line, not a link back to its original
-        // (already-invoiced) Sanam invoice_item.
+        // job_id links back to a completed DeepT job; sanam_document_id
+        // links back to an imported-but-unbilled Sanam work item (see
+        // clients.py's _get_sanam_documents) -- the backend marks it billed
+        // (invoice_id) once the invoice is actually created, so it won't be
+        // offered again for a second invoice.
         invoiceDraft.push({
             description, quantity: 1, unit_price_toman: priceToman,
-            job_id: type === 'job' ? id : null, _source_key: key,
+            job_id: type === 'job' ? id : null,
+            sanam_document_id: type === 'sanam' ? id : null,
+            _source_key: key,
         });
     } else {
         invoiceDraft = invoiceDraft.filter(row => row._source_key !== key);
     }
     renderDraftRows();
+}
+
+// ── Bulk action bar: create invoice / delete / edit fields ──────────────
+// Appears above the activity list the moment any row is checked, acting
+// on whichever activity-list rows are currently checked (i.e. present in
+// invoiceDraft with a _source_key -- a manually-typed draft row has none,
+// so it's never counted here). "Create invoice" just reuses the existing
+// submitDraftInvoice() flow; delete/edit act on the underlying job/sanam
+// record itself, not just its draft copy.
+function checkedActivityRows() {
+    const checkedKeys = new Set(invoiceDraft.map(r => r._source_key).filter(Boolean));
+    return lastActivityRows.filter(r => checkedKeys.has(activityRowKey(r.type, r.id)));
+}
+
+function updateActivityBulkBar() {
+    ['cd', 'cp'].forEach(prefix => {
+        const bar = document.getElementById(`${prefix}-activity-bulk-bar`);
+        if (!bar) return;
+        const checked = checkedActivityRows();
+        if (!checked.length) { bar.classList.add('hidden'); return; }
+        bar.classList.remove('hidden');
+        const countEl = document.getElementById(`${prefix}-activity-bulk-count`);
+        if (countEl) countEl.textContent = `${checked.length.toLocaleString()} مورد انتخاب شده`;
+
+        // A DeepT job is never deletable (it's the record of real
+        // translation work performed) -- only Sanam-imported rows are.
+        // Styled as disabled but never given the actual `disabled`
+        // attribute -- a real disabled button swallows the click before it
+        // ever reaches bulkDeleteCheckedActivityRows()/
+        // openEditWorkRecordModalForSelection() below, so their own toast
+        // explaining *why* never fires and the button just looks broken.
+        const hasJob = checked.some(r => r.type === 'job');
+        const deleteBtn = document.getElementById(`${prefix}-activity-bulk-delete`);
+        if (deleteBtn) {
+            deleteBtn.style.opacity = hasJob ? '.45' : '1';
+            deleteBtn.style.cursor = hasJob ? 'not-allowed' : 'pointer';
+            deleteBtn.title = hasJob ? 'رکوردهای ترجمه قابل حذف نیستند -- فقط رکوردهای سنام حذف‌شدنی‌اند.' : '';
+        }
+        // Editing multiple different rows' fields in one form doesn't make
+        // sense -- only enabled for exactly one checked row.
+        const editBtn = document.getElementById(`${prefix}-activity-bulk-edit`);
+        if (editBtn) {
+            const single = checked.length === 1;
+            editBtn.style.opacity = single ? '1' : '.45';
+            editBtn.style.cursor = single ? 'pointer' : 'not-allowed';
+            editBtn.title = single ? '' : 'برای ویرایش، فقط یک مورد را انتخاب کنید.';
+        }
+    });
+}
+
+// Re-fetches just the jobs/sanam_documents for the open client and
+// re-renders the activity list -- unlike openClientDetail/openClientProfile,
+// this leaves invoiceDraft untouched (aside from whatever the caller already
+// removed/updated), so an unrelated manually-typed draft row or a still-
+// checked other item survives a delete/edit of one record.
+async function _refetchClientActivity(clientId) {
+    if (!clientId) return;
+    const token = localStorage.getItem('deept_token');
+    try {
+        const res = await fetch(`${CORE}/clients/${clientId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error();
+        const c = await res.json();
+        renderClientActivityList(c.jobs || [], c.sanam_documents || []);
+    } catch (e) {
+        showToast('خطا در به‌روزرسانی سابقهٔ مشتری.');
+    }
+}
+
+async function bulkDeleteCheckedActivityRows() {
+    const checked = checkedActivityRows();
+    if (!checked.length) return;
+    if (checked.some(r => r.type === 'job')) {
+        showToast('⚠️ رکوردهای ترجمه قابل حذف نیستند.');
+        return;
+    }
+    if (!confirm(`${checked.length} رکورد برای همیشه حذف شود؟ این کار قابل بازگشت نیست.`)) return;
+
+    const token = localStorage.getItem('deept_token');
+    let failed = 0;
+    for (const row of checked) {
+        try {
+            const res = await fetch(`${CORE}/invoices/sanam-documents/${row.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!res.ok) { failed++; continue; }
+            invoiceDraft = invoiceDraft.filter(r => r._source_key !== activityRowKey(row.type, row.id));
+        } catch (e) {
+            failed++;
+        }
+    }
+    renderDraftRows();
+    await _refetchClientActivity(currentClientDetailId);
+    showToast(failed ? `⚠️ ${failed} مورد حذف نشد (احتمالاً قبلاً در فاکتوری استفاده شده).` : '✅ رکورد(ها) حذف شد.');
+}
+
+function openEditWorkRecordModalForSelection() {
+    const checked = checkedActivityRows();
+    if (checked.length !== 1) {
+        showToast(checked.length ? '⚠️ برای ویرایش، فقط یک مورد را انتخاب کنید.' : '⚠️ ابتدا یک مورد را انتخاب کنید.');
+        return;
+    }
+    openEditWorkRecordModal(checked[0].type, checked[0].id);
+}
+
+function openEditWorkRecordModal(type, id) {
+    const row = lastActivityRows.find(r => r.type === type && String(r.id) === String(id));
+    if (!row) return;
+    editWorkRecordTarget = { type, id };
+
+    const fieldsBox = document.getElementById('edit-work-record-fields');
+    if (type === 'job') {
+        fieldsBox.innerHTML = `
+            <label class="text-xs font-bold block mb-1" style="color:var(--text-main);">قیمت (تومان)</label>
+            <input type="number" id="ewr-price" class="auth-input en w-full" dir="ltr" value="${row.price || 0}">
+            <p class="text-[11px] mt-2" style="color:var(--text-muted);">فقط قیمت این سفارش قابل ویرایش است -- نوع سند تغییر نمی‌کند.</p>`;
+    } else {
+        fieldsBox.innerHTML = `
+            <label class="text-xs font-bold block mb-1" style="color:var(--text-main);">شرح</label>
+            <input type="text" id="ewr-description" class="auth-input w-full" value="${(row.title || '').replace(/"/g, '&quot;')}">
+            <label class="text-xs font-bold block mb-1 mt-2.5" style="color:var(--text-main);">تعداد کپی</label>
+            <input type="number" id="ewr-copies" class="auth-input en w-full" dir="ltr" min="1" value="${row.copies || 1}">
+            <label class="text-xs font-bold block mb-1 mt-2.5" style="color:var(--text-main);">قیمت (تومان)</label>
+            <input type="number" id="ewr-price" class="auth-input en w-full" dir="ltr" value="${row.price || 0}">
+            <label class="text-xs font-bold block mb-1 mt-2.5" style="color:var(--text-main);">تاریخ درخواست</label>
+            <input type="text" id="ewr-date" class="auth-input w-full" value="${(row.date || '').replace(/"/g, '&quot;')}">`;
+    }
+    document.getElementById('editWorkRecordModal').classList.remove('hidden');
+}
+
+function closeEditWorkRecordModal() {
+    editWorkRecordTarget = null;
+    document.getElementById('editWorkRecordModal').classList.add('hidden');
+}
+
+async function submitEditWorkRecord() {
+    if (!editWorkRecordTarget) return;
+    const { type, id } = editWorkRecordTarget;
+    const token = localStorage.getItem('deept_token');
+
+    let url, body;
+    if (type === 'job') {
+        url = `${CORE}/jobs/${id}/fields`;
+        body = { price_toman: parseInt(document.getElementById('ewr-price').value, 10) || 0 };
+    } else {
+        url = `${CORE}/invoices/sanam-documents/${id}`;
+        body = {
+            description: document.getElementById('ewr-description').value.trim(),
+            copies: parseInt(document.getElementById('ewr-copies').value, 10) || 1,
+            price_toman: parseInt(document.getElementById('ewr-price').value, 10) || 0,
+            request_date: document.getElementById('ewr-date').value.trim() || null,
+        };
+    }
+
+    try {
+        const res = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'خطای سرور'); }
+
+        // A row already checked into the draft keeps stale values (they
+        // were snapshotted at check-time) unless refreshed here too.
+        const draftRow = invoiceDraft.find(r => r._source_key === activityRowKey(type, id));
+        if (draftRow) {
+            if (body.description !== undefined) draftRow.description = body.description;
+            draftRow.unit_price_toman = body.price_toman;
+            renderDraftRows();
+        }
+
+        closeEditWorkRecordModal();
+        showToast('✅ رکورد ویرایش شد.');
+        await _refetchClientActivity(currentClientDetailId);
+    } catch (e) {
+        showToast(`❌ ${e.message || 'ویرایش ناموفق بود.'}`);
+    }
 }
 
 // The full-window profile page (cp-) shows this as a real <table> (it has
@@ -2440,13 +3052,15 @@ function renderClientActivityList(jobs, sanamDocs) {
     });
     (sanamDocs || []).forEach(d => {
         rows.push({
-            type: 'sanam', id: d.id, date: d.date,
-            title: d.description + (d.quantity > 1 ? ` ×${d.quantity}` : ''),
-            price: d.line_total_toman || 0, trackingCode: d.tracking_code,
-            checkable: true,
+            type: 'sanam', id: d.id, date: d.request_date || d.created_at,
+            title: d.description, copies: d.copies || 1,
+            price: d.price_toman || 0, trackingCode: d.tracking_code,
+            // Already attached to an invoice -- don't offer it for a second one.
+            checkable: !d.invoice_id, billed: !!d.invoice_id,
         });
     });
     rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    lastActivityRows = rows;
 
     if (countEl) countEl.textContent = rows.length;
     if (prefix === 'cp') renderClientStats(rows);
@@ -2456,18 +3070,20 @@ function renderClientActivityList(jobs, sanamDocs) {
         box.innerHTML = prefix === 'cp'
             ? `<tr><td colspan="6" class="text-xs text-center py-4" style="color:var(--text-muted);">${emptyMsg}</td></tr>`
             : `<div class="text-xs text-center py-4" style="color:var(--text-muted);">${emptyMsg}</div>`;
+        updateActivityBulkBar();
         return;
     }
 
     box.innerHTML = rows.map(r => {
         const color = ACTIVITY_CATEGORY_COLORS[r.type];
         const checked = isActivityInDraft(activityRowKey(r.type, r.id));
-        const st = r.type === 'job' ? (ACTIVITY_STATUS_LABELS[r.status] || { text: escapeHtml(r.status), color: 'var(--text-muted)' }) : null;
+        const st = r.type === 'job' ? (ACTIVITY_STATUS_LABELS[r.status] || { text: escapeHtml(r.status), color: 'var(--text-muted)' })
+            : (r.billed ? { text: 'فاکتور شده', color: '#4ade80' } : null);
         const idBadge = r.type === 'job'
             ? `<span class="en" style="color:var(--text-muted);font-size:.65rem;" title="شناسه کار">#${escapeHtml(String(r.id).slice(0, 8))}</span>`
             : (r.trackingCode ? `<span class="en" style="color:var(--text-muted);font-size:.65rem;">کد پیگیری ${escapeHtml(r.trackingCode)}</span>` : '');
         const dateStr = r.date ? escapeHtml(String(r.date).slice(0, 10)) : '—';
-        const dotTitle = r.type === 'job' ? 'ترجمه ماشینی DeepT' : (r.type === 'sanam' ? 'وارد شده از سنام' : 'ردیف دستی');
+        const dotTitle = r.type === 'job' ? 'ترجمه ماشینی' : (r.type === 'sanam' ? 'وارد شده از سنام' : 'ردیف دستی');
         const checkbox = `<input type="checkbox" ${checked ? 'checked' : ''} ${r.checkable ? '' : 'disabled'}
             data-activity-key="${escapeHtml(activityRowKey(r.type, r.id))}"
             onchange='toggleActivityInDraft(${JSON.stringify(r.type)}, ${JSON.stringify(r.id)}, ${JSON.stringify(r.title)}, ${r.price}, this.checked)'
@@ -2480,7 +3096,7 @@ function renderClientActivityList(jobs, sanamDocs) {
                 <td class="en" style="padding:.6rem;color:var(--text-muted);">${idBadge || '—'}</td>
                 <td class="en" style="padding:.6rem;color:var(--text-muted);">${dateStr}</td>
                 <td class="en font-bold" style="padding:.6rem;color:var(--accent);">${r.price ? r.price.toLocaleString() + ' ت' : '—'}</td>
-                <td style="padding:.6rem;text-align:center;">${checkbox}</td>
+                <td style="padding:.6rem;text-align:center;">${r.billed ? `<span class="status-pill" style="color:${st.color};background:${st.color}1f;">${st.text}</span>` : checkbox}</td>
             </tr>`;
         }
         return `<div class="flex items-center gap-2.5 p-2.5 rounded-lg text-xs" style="background:var(--bg-main);border:1px solid var(--border-subtle);border-inline-start:3px solid ${color};">
@@ -2493,6 +3109,7 @@ function renderClientActivityList(jobs, sanamDocs) {
             ${st ? `<span class="status-pill" style="color:${st.color};background:${st.color}1f;">${st.text}</span>` : ''}
         </div>`;
     }).join('');
+    updateActivityBulkBar();
 }
 
 // Quick-glance numbers above the profile's activity table -- a failed job
@@ -2574,7 +3191,7 @@ async function renderClientInvoices(clientId) {
 // times in one order. ──────────────────────────────────────────────────
 
 function addCustomInvoiceRow() {
-    invoiceDraft.push({ description: '', quantity: 1, unit_price_toman: 0, job_id: null });
+    invoiceDraft.push({ description: '', quantity: 1, unit_price_toman: 0, job_id: null, sanam_document_id: null });
     renderDraftRows();
 }
 
@@ -2756,6 +3373,7 @@ function selectMyPriceListItem(instance, itemId) {
         renderInvoiceEditRows();
     } else {
         row.job_id = null;
+        row.sanam_document_id = null;
         invoiceDraft.push(row);
         renderDraftRows();
     }
@@ -2854,6 +3472,7 @@ function renderDraftRows() {
         </div>`;
     }).join('');
     updateDraftTotal();
+    updateActivityBulkBar();
 }
 
 async function submitDraftInvoice(invoiceType) {
@@ -2866,6 +3485,7 @@ async function submitDraftInvoice(invoiceType) {
         quantity: row.quantity || 1,
         line_total_toman: (row.quantity || 0) * (row.unit_price_toman || 0),
         job_id: row.job_id,
+        sanam_document_id: row.sanam_document_id,
     }));
 
     const token = localStorage.getItem('deept_token');
@@ -3447,7 +4067,7 @@ function hideWorkspaceViews() {
     const lp = document.getElementById('landingPage');
     if (lp) lp.style.display = 'none';
     ['workspaceDashboard', 'clientsWorkspace', 'adminDashboard',
-     'clientProfilePage', 'workSchedulePage', 'settingsPage', 'myPriceListPage', 'hrPage'].forEach(id => {
+     'clientProfilePage', 'workSchedulePage', 'settingsPage', 'myPriceListPage', 'hrPage', 'homePanelsPage', 'dateConverterPage'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
@@ -3557,6 +4177,34 @@ function closeClientProfilePage() {
     document.body.style.overflow = 'auto';
     currentClientDetailId = null;
     openClientsWorkspace(false);
+}
+
+// Removes a client entirely -- from the dashboard list's own 🗑 button, or
+// from "🗑 حذف مشتری" on the open profile page itself. The backend blocks
+// this once the client has any invoices (see DELETE /clients/{id}), since
+// those are real financial records that must outlive the client they
+// billed -- surfaced here as a plain error toast, not a silent no-op.
+async function deleteClient(clientId) {
+    if (!clientId) return;
+    if (!confirm('این مشتری برای همیشه حذف شود؟ این کار قابل بازگشت نیست.')) return;
+
+    const token = localStorage.getItem('deept_token');
+    try {
+        const res = await fetch(`${CORE}/clients/${clientId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'خطای سرور'); }
+
+        showToast('✅ مشتری حذف شد.');
+        if (isProfilePageOpen() && currentClientDetailId === clientId) {
+            closeClientProfilePage();
+        } else {
+            await renderDashboardClients('', true);
+        }
+    } catch (e) {
+        showToast(`❌ ${e.message || 'حذف مشتری ناموفق بود.'}`);
+    }
 }
 
 // Start a new project tied to the currently open client profile.
@@ -4359,11 +5007,11 @@ async function handleSanamFileSelected(file) {
         status.style.color = errors.length ? '#fb923c' : 'var(--accent)';
         status.textContent =
             `${errors.length ? '⚠️' : '✅'} ${data.clients_touched} مشتری ثبت/به‌روزرسانی شد — ` +
-            `${data.invoices_created} فاکتور جدید ساخته شد` +
-            (data.invoices_skipped_already_imported ? ` (${data.invoices_skipped_already_imported} فاکتور قبلاً وارد شده بود و رد شد)` : '') +
-            (errors.length ? ` — ${errors.length} ردیف رد شد: ${errors.map(e => `کد پیگیری ${e.tracking_code} (${e.reason})`).join('، ')}` : '') +
-            '.';
-        renderDashboardClients();
+            `${data.documents_created} کار جدید به پروفایل مشتریان اضافه شد` +
+            (data.documents_skipped_already_imported ? ` (${data.documents_skipped_already_imported} مورد قبلاً وارد شده بود و رد شد)` : '') +
+            (errors.length ? ` — ${errors.length} ردیف رد شد: ${errors.map(e => `شماره تمبر ${e.stamp_number} (${e.reason})`).join('، ')}` : '') +
+            ' — برای صدور فاکتور، از پروفایل هر مشتری موارد موردنظر را انتخاب کنید.';
+        renderDashboardClients('', true);
     } catch (err) {
         status.style.color = '#f87171';
         status.textContent = `❌ ${err.message || 'بارگذاری فایل سنام ناموفق بود.'}`;
@@ -4416,9 +5064,13 @@ function purgeFile(idx) {
         showToast('🗑️ فایل حذف شد.');
     }
 }
+// Runs regardless of which view is open (not just while میز کار is
+// visible) so a job-complete notification can fire even when the user is
+// elsewhere in the app; renderDashboardActiveProjects() itself guards on
+// currentUserSession and just updates the (possibly hidden) table otherwise.
 setInterval(async () => {
-    if (allJobsTerminal) return;
-    if (!document.getElementById('workspaceDashboard').classList.contains('hidden')) await renderDashboardActiveProjects();
+    if (allJobsTerminal || !currentUserSession) return;
+    await renderDashboardActiveProjects();
 }, 30000);
 
 // ═══════════════════════════════════════════════════════════
@@ -4506,6 +5158,28 @@ function applyRouteForPath(path) {
             showToast('برای دسترسی به این بخش، ابتدا وارد شوید.');
         }
 
+    } else if (path === '/home/date-converter') {
+
+        if (currentUserSession) {
+            openDateConverterPage(false);
+        } else {
+            navigateTo('/', false);
+            showLandingView();
+            openLogin();
+            showToast('برای دسترسی به این بخش، ابتدا وارد شوید.');
+        }
+
+    } else if (path === '/home') {
+
+        if (currentUserSession) {
+            openHomePanels(false);
+        } else {
+            navigateTo('/', false);
+            showLandingView();
+            openLogin();
+            showToast('برای دسترسی به این بخش، ابتدا وارد شوید.');
+        }
+
     } else if (path === '/hr') {
 
         if (currentUserSession) {
@@ -4543,7 +5217,7 @@ function applyRouteForPath(path) {
 
         // Root / unknown route
         if (currentUserSession) {
-            openWorkspaceDashboard(false);
+            openHomePanels(false);
         } else {
             showLandingView();
         }
@@ -4575,7 +5249,45 @@ function openChatInterface(pushHistory = true, forceStage = null) {
     }
     if (pushHistory) navigateTo('/new-project');
 }
+// Fully clears every piece of in-flight translation-pipeline state (doc type,
+// passport session(s), uploaded files, manual fields) so reopening the modal
+// always starts from a clean slate. Called whenever the pipeline is closed.
+function resetTranslationPipeline() {
+    confirmedPassports.forEach(p => {
+        if (p.session_id) fetch(`${getActiveBackendOrigin()}/passport/${p.session_id}`, { method:'DELETE' }).catch(()=>{});
+    });
+    confirmedPassports = [];
+    selectedClientId = null;
+    mainContactClientId = null;
+    mainContactNationalId = null;
+    updateClientBadge();
+
+    ppSelectedFile  = null;
+    docSelectedFile = null;
+    ppSetMode(null);
+
+    ppClearFields();
+    document.getElementById('pp-file-input').value = '';
+    document.getElementById('pp-file-name').textContent = '';
+    document.getElementById('pp-file-name').classList.add('hidden');
+    document.getElementById('pp-drop-text').classList.remove('hidden');
+    document.getElementById('pp-extract-btn').disabled = true;
+    document.getElementById('pp-extract-btn').textContent = 'استخراج اطلاعات از پاسپورت';
+    document.getElementById('pp-client-search').value = '';
+    document.getElementById('pp-client-results').innerHTML = '';
+    document.getElementById('ppModeButtons').classList.remove('hidden');
+
+    document.getElementById('docTemplateSearch').value = '';
+    document.getElementById('docTemplate').value = '';
+    closeDocDropdownList();
+
+    document.getElementById('includeCourseCodesCheckbox').checked = false;
+    resetDocZone();
+    showOnlyStage('doctype');
+}
+
 function closeChatInterface(pushHistory = true) {
+    resetTranslationPipeline();
     document.getElementById('chatModal').classList.add('hidden');
     if (document.getElementById('workspaceDashboard').classList.contains('hidden')) {
         document.body.style.overflow = 'auto';
@@ -4601,7 +5313,7 @@ function showOnlyStage(stage) {
         document.getElementById('step2Panel').classList.toggle('hidden', stage !== 'document');
     if (stage === 'document') {
         const currentDocType = document.getElementById('docTemplate').value;
-        document.getElementById('courseCodesToggleWrap').classList.toggle('hidden', currentDocType !== 'academic-transcript');
+        document.getElementById('courseCodesToggleWrap').classList.toggle('hidden', !DOCUMENT_REGISTRY[currentDocType]?.courseCodesToggle);
     }
 }
 
@@ -5071,7 +5783,7 @@ async function submitAddClient() {
         showToast(clientEditingId ? '✅ تغییرات ذخیره شد.' : '✅ مشتری افزوده شد.');
         const savedId = clientEditingId || (await res.json().catch(()=>({}))).id;
         clientEditingId = null;
-        renderDashboardClients();
+        renderDashboardClients('', true);
         if (currentUserSession && isProfilePageOpen() && savedId) {
             await openClientProfile(savedId);
         } else if (currentUserSession && savedId) {
@@ -5175,7 +5887,7 @@ function toggleMultiPassportUI() {
     const docType = document.getElementById('docTemplate').value;
     const docDef  = DOCUMENT_REGISTRY[docType];
     const block   = document.getElementById('multiPassportBlock');
-    if (docDef && docDef.usePassportSession && !docDef.legacySingleSession) {
+    if (docDef && docDef.usePassportSession) {
         block.classList.remove('hidden');
         document.getElementById('multiPassportCount').textContent = confirmedPassports.length;
     } else {
@@ -5221,8 +5933,21 @@ function confirmNewClient() {
 // ═══════════════════════════════════════════════════════════
 // STEP 2 — DOCUMENT UPLOAD & TRANSLATION
 // ═══════════════════════════════════════════════════════════
+// The backend document pipeline (Gemini-based multi-page processing) only
+// accepts PDFs; a non-PDF used to reach it anyway and get rejected only
+// after a wasted API call. Checked on file.type OR extension -- drag-and-
+// drop from some file managers doesn't always set a reliable MIME type.
+function isPdfFile(file) {
+    return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+}
+
 function handleDocFileSelection(file) {
     if (!file) return;
+    if (!isPdfFile(file)) {
+        showToast('⚠️ فقط فایل PDF پذیرفته می‌شود. لطفاً سند را به‌صورت PDF بارگذاری کنید.');
+        document.getElementById('docFileInput').value = '';
+        return;
+    }
     docSelectedFile = file;
     document.getElementById('docFileInfo').textContent = `📄 ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
     document.getElementById('docFileInfo').classList.remove('hidden');
@@ -5265,7 +5990,7 @@ async function uploadFileInChunks(file, onProgress) {
         let succeeded = false;
         for (let attempt = 1; attempt <= MAX_RETRIES_PER_CHUNK; attempt++) {
             try {
-                const res = await fetch('https://backend-backup.deept.ir/upload/chunk', {
+                const res = await fetch(`${BACKEND}/upload/chunk`, {
                     method: 'POST',
                     body: fd,
                 });
@@ -5330,34 +6055,16 @@ async function executeTranslationPipeline() {
     fd.append('document_file', docSelectedFile);
     fd.append('idempotency_key', idempotencyKey);
 
-    if (docType === 'academic-transcript') {
+    if (docDef.courseCodesToggle) {
         const includeCourseCodes = document.getElementById('includeCourseCodesCheckbox').checked;
         fd.append('include_course_codes', includeCourseCodes ? 'true' : 'false');
     }
     
-    // Passport session(s). police-certificate still uses its old backend
-    // contract (legacySingleSession) until that repo is updated; every other
-    // document type uses the universal multi-passport contract by default.
-if (docDef.usePassportSession) {
-        if (docDef.legacySingleSession) {
-            let sid = confirmedPassports[0]?.session_id;
-            if (!sid) {
-                try {
-                    statusText.textContent = 'در حال ایجاد جلسه موقت...';
-                    const r = await fetch(`${getActiveBackendOrigin()}/passport/confirm`, {
-                        method: 'POST',
-                        headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({ first_name:'', last_name:'', father_name:'', date_of_birth:'' })
-                    });
-                    const d = await r.json();
-                    sid = d.session_id;
-                } catch(e) { /* backend will fall back to doc-extracted identity */ }
-            }
-            if (sid) fd.append('session_id', sid);
-        } else {
-            confirmedPassports.forEach(p => fd.append('session_ids', p.session_id));
-            if (selectedClientId) fd.append('client_id', selectedClientId);
-        }
+    // Passport session(s) + client link. Every document type uses the
+    // universal multi-passport contract.
+    if (docDef.usePassportSession) {
+        confirmedPassports.forEach(p => fd.append('session_ids', p.session_id));
+        if (selectedClientId) fd.append('client_id', selectedClientId);
     }
 
     const url = docDef.endpoint;
@@ -5396,7 +6103,7 @@ if (docDef.usePassportSession) {
     // pieces instead -- only a failed piece needs retrying, not the whole
     // file each time, so this is much more likely to get through on a
     // genuinely bad connection.
-    if (directFailed && docType === 'academic-transcript') {
+    if (directFailed && docDef.chunkedUpload) {
         try {
             const uploadId = await uploadFileInChunks(docSelectedFile, (percent) => {
                 statusText.textContent = `در حال آپلود سند... ${percent}%`;
@@ -5405,16 +6112,13 @@ if (docDef.usePassportSession) {
             const chunkedFd = new FormData();
             chunkedFd.append('upload_id', uploadId);
             chunkedFd.append('idempotency_key', idempotencyKey);
-            if (docType === 'academic-transcript') {
+            if (docDef.courseCodesToggle) {
                 chunkedFd.append('include_course_codes', fd.get('include_course_codes'));
             }
             if (docDef.usePassportSession) {
-                if (docDef.legacySingleSession) {
-                    const sid = fd.get('session_id');
-                    if (sid) chunkedFd.append('session_id', sid);
-                } else {
-                    fd.getAll('session_ids').forEach(sid => chunkedFd.append('session_ids', sid));
-                }
+                fd.getAll('session_ids').forEach(sid => chunkedFd.append('session_ids', sid));
+                const cid = fd.get('client_id');
+                if (cid) chunkedFd.append('client_id', cid);
             }
 
             statusText.textContent = 'در حال پردازش؛ این فرایند ممکن است چند دقیقه طول بکشد. لطفا منتظر بمانید.';
@@ -5432,7 +6136,12 @@ if (docDef.usePassportSession) {
 
     if (!res.ok) {
         const err = await res.json().catch(()=>({detail:'خطای ناشناخته'}));
-        throw new Error(err.detail);
+        // The backend sanitizes every client-facing error to Persian text
+        // (and passes 402 "insufficient credit" / 404 "no wallet yet"
+        // through verbatim -- see main.py's HTTPException handler). Mark it
+        // so the catch block can surface this safe detail instead of the
+        // generic fallback, without ever leaking raw English network text.
+        throw { backendDetail: err.detail };
     }
         // Backend now returns a ticket immediately -- {job_id, status,
         // price_toman, page_count} -- NOT the finished file. The actual
@@ -5452,12 +6161,22 @@ if (docDef.usePassportSession) {
         document.getElementById('nextDocBtn').classList.remove('hidden');
 
     } catch (err) {
-        // Never display err.message directly -- it can be raw English from
-        // a network-level failure (timeout, CORS, connection drop), not
-        // just backend detail text. Always show a fixed Persian message.
+        // Only backend-sanitized Persian detail is shown directly (the
+        // 402/404 wallet messages above). Everything else -- genuine
+        // network failures whose `err.message` can be raw English from a
+        // timeout/CORS/connection drop -- stays behind a fixed message.
         statusBubble.classList.add('hidden');
-        showToast('❌ خطا در پردازش سند. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.');
-    } finally {
+        if (err && err.backendDetail) {
+            showToast(`❌ ${err.backendDetail}`);
+        } else {
+            showToast('❌ خطا در پردازش سند. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.');
+        }
+        // Only re-enable on failure. A successful submission leaves it
+        // disabled on purpose -- the job ticket is already created at this
+        // point, so a second click (or an accidental double-click) would
+        // re-translate and re-charge for the exact same document. The way
+        // back in is "سند مدرک بعدی" (resetForNextDocument), which clears
+        // docSelectedFile and only re-enables once a fresh file is chosen.
         submitBtn.disabled = false;
     }
 }
@@ -5486,6 +6205,12 @@ function resetForNextDocument() {
 // INIT
 // ═══════════════════════════════════════════════════════════
 refreshWalletBalanceDisplay();
+
+// Pending password-reset token (set by openResetPassword from the emailed
+// link, consumed by handleResetPassword). Declared before initializeApp so
+// the IIFE below can call openResetPassword without hitting the `let` TDZ.
+let pendingResetToken = null;
+
 (function initializeApp() {
     const params = new URLSearchParams(window.location.search);
 
@@ -5527,6 +6252,7 @@ refreshWalletBalanceDisplay();
     // a saved profile edit shows up in a different tab/session. Self-heals
     // on every page load instead of requiring a re-login.
     syncProfileFromServer();
+    loadSystemAnnouncement();
 
     // GitHub Pages has no server routing: a refresh on /dashboard etc. lands
     // on 404.html, which stashes the intended path (+ query string, e.g. a
@@ -5567,7 +6293,6 @@ refreshWalletBalanceDisplay();
         openLogin();
         window.history.replaceState({}, document.title, window.location.pathname);
     }
-
     // Password reset link (from DeepT-Core's send_password_reset_email) --
     // opens the "set new password" modal directly with the token already
     // in hand, same idea as the activation redirect above.
@@ -5630,6 +6355,7 @@ document.getElementById('loginSuccess').classList.add('show');
 
 currentUserSession = loadSession();
 syncUserSessionDOM();
+loadSystemAnnouncement();
 
 setTimeout(() => {
     closeModals();
@@ -5689,6 +6415,14 @@ function openSignup() {
     document.getElementById('signupOverlay').classList.add('open');
 }
 function openAuthModal() { openLogin(); }
+function togglePasswordVisibility(btn) {
+    const input = btn.parentElement.querySelector('input');
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.classList.toggle('showing', show);
+    btn.setAttribute('aria-label', show ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور');
+}
 function openForgotPassword() {
     const form = document.getElementById('forgotPasswordForm');
     const succ = document.getElementById('forgotPasswordSuccess');
@@ -5720,6 +6454,7 @@ function closeModals()   {
     ['loginOverlay','signupOverlay','quickStartOverlay','forgotPasswordOverlay','resetPasswordOverlay'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.classList.remove('open');
     });
+    qsReset();
 }
 function switchToSignup() { closeModals(); setTimeout(openSignup,80); }
 function switchToLogin()  { closeModals(); setTimeout(openLogin,80); }
@@ -5734,10 +6469,8 @@ async function handleForgotPassword() {
     if (!email) { err.textContent='لطفاً ایمیل خود را وارد کنید.'; err.classList.add('show'); return; }
     btn.textContent='در حال ارسال...'; btn.disabled=true;
     try {
-        await corePost('/auth/forgot-password', { email });
-        // Same success state regardless of the response body -- the
-        // backend deliberately never reveals whether this email is
-        // actually registered (see DeepT-Core's /auth/forgot-password).
+        const { ok } = await corePost('/auth/forgot-password', { email });
+        if (!ok) { err.textContent='خطا در ارسال درخواست.'; err.classList.add('show'); btn.textContent='ارسال لینک بازیابی'; btn.disabled=false; return; }
         document.getElementById('forgotPasswordForm').style.display='none';
         document.getElementById('forgotPasswordSuccess').classList.add('show');
     } catch(e) {
@@ -5759,26 +6492,13 @@ async function handleResetPassword() {
     try {
         const {ok,data} = await corePost('/auth/reset-password', { token: resetPasswordToken, new_password: pass });
         if (!ok) { err.textContent=data.detail||'لینک بازیابی نامعتبر یا منقضی شده است.'; err.classList.add('show'); btn.textContent='تنظیم رمز عبور'; btn.disabled=false; return; }
-        if (!saveSession(data)) {
-            console.error('Password reset succeeded but session could not be saved.');
-            return;
-        }
-
         document.getElementById('resetPasswordForm').style.display='none';
         document.getElementById('resetPasswordSuccess').classList.add('show');
 
-        currentUserSession = loadSession();
-        syncUserSessionDOM();
-
         setTimeout(() => {
-            closeModals();
             resetPasswordToken = null;
             window.history.replaceState({}, document.title, window.location.pathname);
-            if (currentUserSession?.is_admin) {
-                showAdminDashboard();
-            } else {
-                showDashboardView();
-            }
+            switchToLogin();
         }, 1400);
     } catch(e) { err.textContent='خطا در اتصال.'; err.classList.add('show'); btn.textContent='تنظیم رمز عبور'; btn.disabled=false; }
 }
@@ -5859,12 +6579,16 @@ function j2g(jy,jm,jd){
 }
 /* ============ SECTION: DATE TOOL + QUICK-START PIPELINE ============
    Persian->Gregorian converter (j2g) + no-signup quick-start modal. ============ */
-function convertDate(){
-    const day=parseInt(document.getElementById('t-day').value);
-    const mon=parseInt(document.getElementById('t-month').value);
-    const yr=parseInt(document.getElementById('t-year').value);
-    const errEl=document.getElementById('t-error');
-    const resEl=document.getElementById('t-result');
+// prefix lets more than one copy of this tool live on the page at once
+// (the landing page's own "t-" ids, plus صفحه نخست's "h-" ids) without id
+// collisions -- defaults to 't' so the landing page's existing
+// onclick="convertDate()" keeps working unchanged.
+function convertDate(prefix='t'){
+    const day=parseInt(document.getElementById(`${prefix}-day`).value);
+    const mon=parseInt(document.getElementById(`${prefix}-month`).value);
+    const yr=parseInt(document.getElementById(`${prefix}-year`).value);
+    const errEl=document.getElementById(`${prefix}-error`);
+    const resEl=document.getElementById(`${prefix}-result`);
     errEl.classList.remove('show');resEl.classList.remove('show');
     if(!day||!mon||!yr){errEl.textContent='همه موارد را وارد کنید.';errEl.classList.add('show');return;}
     if(yr<1200||yr>1500){errEl.textContent='سال شمسی معتبر وارد کنید (مثلاً ۱۳۸۰).';errEl.classList.add('show');return;}
@@ -5873,11 +6597,11 @@ function convertDate(){
         const{gy,gm,gd}=j2g(yr,mon,day);
         const obj=new Date(gy,gm-1,gd);
         const p=n=>String(n).padStart(2,'0');
-        document.getElementById('t-main').textContent=`${gy} / ${p(gm)} / ${p(gd)}`;
-        document.getElementById('t-f1').textContent=`${gy}-${p(gm)}-${p(gd)}`;
-        document.getElementById('t-f2').textContent=`${p(gd)}/${p(gm)}/${gy}`;
-        document.getElementById('t-f3').textContent=`${p(gm)}/${p(gd)}/${gy}`;
-        document.getElementById('t-f4').textContent=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric'}).format(obj);
+        document.getElementById(`${prefix}-main`).textContent=`${gy} / ${p(gm)} / ${p(gd)}`;
+        document.getElementById(`${prefix}-f1`).textContent=`${gy}-${p(gm)}-${p(gd)}`;
+        document.getElementById(`${prefix}-f2`).textContent=`${p(gd)}/${p(gm)}/${gy}`;
+        document.getElementById(`${prefix}-f3`).textContent=`${p(gm)}/${p(gd)}/${gy}`;
+        document.getElementById(`${prefix}-f4`).textContent=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric'}).format(obj);
         resEl.classList.add('show');
     }catch(e){errEl.textContent='خطا در تبدیل.';errEl.classList.add('show');}
 }
@@ -5932,6 +6656,10 @@ function qsReset() {
     document.getElementById('qsPassFileName').textContent='';
     document.getElementById('qsDocFileName').style.display='none';
     document.getElementById('qsDocFileName').textContent='';
+    ['qsFirst','qsLast','qsFather','qsDob'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('qsPassFile').value='';
+    document.getElementById('qsDocFile').value='';
+    document.getElementById('qsDocType').value='police-certificate';
     document.getElementById('qsNext1').disabled=true;
     document.getElementById('qsNext2').disabled=true;
     document.getElementById('qsProcessing').classList.remove('show');
@@ -5969,6 +6697,11 @@ function qsHandlePassport(file) {
 }
 function qsHandleDoc(file) {
     if (!file) return;
+    if (!isPdfFile(file)) {
+        showToast('⚠️ فقط فایل PDF پذیرفته می‌شود. لطفاً سند را به‌صورت PDF بارگذاری کنید.');
+        document.getElementById('qsDocFile').value = '';
+        return;
+    }
     QS.docFile=file;
     const el=document.getElementById('qsDocFileName');
     el.textContent='📄 '+file.name; el.style.display='block';
@@ -6060,7 +6793,7 @@ function qsSimulatePayment() {
 function showDashboardView() {
     const lp=document.getElementById('landingPage');
     if(lp) lp.style.display='none';
-    openWorkspaceDashboard();
+    openHomePanels();
 }
 
 function showAdminDashboard() {
@@ -6074,9 +6807,13 @@ function showAdminDashboard() {
     document.getElementById('workSchedulePage').classList.add('hidden');
     document.getElementById('settingsPage').classList.add('hidden');
     document.getElementById('myPriceListPage').classList.add('hidden');
+    document.getElementById('homePanelsPage').classList.add('hidden');
+    document.getElementById('dateConverterPage').classList.add('hidden');
+    document.getElementById('hrPage').classList.add('hidden');
     document.getElementById('adminDashboard').classList.remove('hidden');
     switchAdminTab('users');
     loadAdminUsers();
+    loadAdminAnnouncementStatus();
     // Without its own URL, a reload had nowhere to route back to and fell
     // through to the landing page instead -- navigateTo is a no-op if the
     // address bar already says /admin (e.g. when applyRouteForPath itself
@@ -6141,6 +6878,9 @@ function renderAdminUsersRows(users) {
             <td class="py-3 px-3">
                 <button onclick="adminViewUserJobs('${u.user_id}', '${(u.email||'').replace(/'/g,"")}')" class="text-sm font-bold px-3 py-2 rounded-lg" style="background:var(--bg-main);color:var(--text-main);border:1px solid var(--border-subtle);">مشاهده</button>
             </td>
+            <td class="py-3 px-3">
+                <button onclick="adminViewUserClients('${u.user_id}', '${(u.email||'').replace(/'/g,"")}')" class="text-sm font-bold px-3 py-2 rounded-lg" style="background:var(--bg-main);color:var(--text-main);border:1px solid var(--border-subtle);">مشاهده</button>
+            </td>
         </tr>
     `).join('');
 }
@@ -6170,6 +6910,64 @@ async function loadAdminUsers() {
         renderAdminUsersRows(adminUsersCache);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال.</td></tr>`;
+    }
+}
+
+// ── System announcement publisher (پنل مدیریت) ──────────────────────────────
+async function loadAdminAnnouncementStatus() {
+    const token = localStorage.getItem('deept_token');
+    const statusEl = document.getElementById('adminAnnouncementStatus');
+    try {
+        const res = await fetch(`${CORE}/announcements/active`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) { statusEl.textContent = 'خطا در دریافت وضعیت.'; return; }
+        const data = await res.json();
+        if (data.active) {
+            statusEl.textContent = `فعال: «${data.message}»`;
+            statusEl.style.color = 'var(--accent)';
+        } else {
+            statusEl.textContent = 'غیرفعال — اعلانی منتشر نشده است.';
+            statusEl.style.color = 'var(--text-muted)';
+        }
+    } catch (e) {
+        statusEl.textContent = 'خطا در اتصال.';
+    }
+}
+
+async function publishSystemAnnouncement() {
+    const token = localStorage.getItem('deept_token');
+    const input = document.getElementById('adminAnnouncementInput');
+    const message = input.value.trim();
+    if (!message) { showToast('متن اعلان نمی‌تواند خالی باشد.'); return; }
+    try {
+        const res = await fetch(`${CORE}/announcements`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'خطای سرور'); }
+        input.value = '';
+        showToast('✅ اعلان منتشر شد.');
+        await loadAdminAnnouncementStatus();
+    } catch (e) {
+        showToast(`❌ ${e.message || 'انتشار اعلان ناموفق بود.'}`);
+    }
+}
+
+async function clearSystemAnnouncement() {
+    if (!confirm('اعلان فعال پاک شود؟')) return;
+    const token = localStorage.getItem('deept_token');
+    try {
+        const res = await fetch(`${CORE}/announcements/active`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error();
+        showToast('✅ اعلان پاک شد.');
+        await loadAdminAnnouncementStatus();
+    } catch (e) {
+        showToast('❌ پاک کردن اعلان ناموفق بود.');
     }
 }
 async function adminDeduct(userId) {
@@ -6261,33 +7059,75 @@ async function adminViewUserJobs(userId, email) {
     const tbody = document.getElementById('adminUserJobsRowsBlock');
     document.getElementById('adminUserJobsTitle').textContent = `پروژه‌های ${email}`;
     panel.classList.remove('hidden');
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-sm" style="color:var(--text-muted);">در حال بارگذاری...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">در حال بارگذاری...</td></tr>`;
     try {
         const res = await fetch(`${CORE}/jobs?user_id=${userId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در دریافت پروژه‌ها.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در دریافت پروژه‌ها.</td></tr>`;
             return;
         }
         const jobs = await res.json();
         if (!jobs.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-sm" style="color:var(--text-muted);">این کاربر پروژه‌ای ندارد.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">این کاربر پروژه‌ای ندارد.</td></tr>`;
             return;
         }
         const typeLabel = (t) => DOCUMENT_REGISTRY[t]?.label || t;
         const statusLabel = (s) => ({queued:'در صف', processing:'در حال پردازش', completed:'تکمیل شده', failed:'ناموفق'}[s] || s);
+        // Not every document type tracks api_cost_usd yet, and a job
+        // predating that field has none -- shown as "—" rather than $0.00.
+        const costCell = (j) => j.api_cost_usd != null
+            ? `$${j.api_cost_usd.toFixed(4)}`
+            : '<span style="color:var(--text-muted);">—</span>';
         tbody.innerHTML = jobs.map(j => `
             <tr style="border-bottom:1px solid var(--divider);">
                 <td class="py-2 px-2" style="color:var(--text-main);">${typeLabel(j.document_type)}</td>
                 <td class="py-2 px-2" style="color:var(--text-muted);">${statusLabel(j.status)}</td>
                 <td class="py-2 px-2 font-mono" style="color:var(--text-main);">${(j.price_toman||0).toLocaleString()}</td>
+                <td class="py-2 px-2 en font-mono" style="color:var(--text-main);">${costCell(j)}</td>
                                 <td class="py-2 px-2 en" style="color:var(--text-muted);">${escapeHtml(j.original_filename)}</td>
                 <td class="py-2 px-2 en" style="color:var(--text-muted);">${(j.created_at||'').slice(0,10)}</td>
             </tr>
         `).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال.</td></tr>`;
+    }
+}
+
+async function adminViewUserClients(userId, email) {
+    const token = localStorage.getItem('deept_token');
+    const panel = document.getElementById('adminUserClientsPanel');
+    const tbody = document.getElementById('adminUserClientsRowsBlock');
+    document.getElementById('adminUserClientsTitle').textContent = `مشتریان ${email}`;
+    panel.classList.remove('hidden');
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-sm" style="color:var(--text-muted);">در حال بارگذاری...</td></tr>`;
+    try {
+        const res = await fetch(`${CORE}/clients?user_id=${userId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در دریافت مشتریان.</td></tr>`;
+            return;
+        }
+        const clients = await res.json();
+        if (!clients.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-sm" style="color:var(--text-muted);">این کاربر مشتری‌ای ندارد.</td></tr>`;
+            return;
+        }
+        const faName = (c) => `${c.first_name_fa || ''} ${c.last_name_fa || ''}`.trim();
+        const enName = (c) => `${c.first_name || ''} ${c.last_name || ''}`.trim();
+        const displayName = (c) => faName(c) || enName(c) || '—';
+        tbody.innerHTML = clients.map(c => `
+            <tr style="border-bottom:1px solid var(--divider);">
+                <td class="py-2 px-2" style="color:var(--text-main);">${escapeHtml(displayName(c))}</td>
+                <td class="py-2 px-2 en" style="color:var(--text-muted);">${escapeHtml(c.national_id) || '—'}</td>
+                <td class="py-2 px-2 en" style="color:var(--text-muted);">${escapeHtml(c.phone) || '—'}</td>
+                <td class="py-2 px-2 en" style="color:var(--text-muted);">${(c.created_at||'').slice(0,10)}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال.</td></tr>`;
     }
 }
 
@@ -6304,7 +7144,9 @@ function switchAdminTab(tab) {
     
     const jobsPanel = document.getElementById('adminUserJobsPanel');
     if (jobsPanel) jobsPanel.classList.add('hidden');
-    
+    const clientsPanel = document.getElementById('adminUserClientsPanel');
+    if (clientsPanel) clientsPanel.classList.add('hidden');
+
     if (tab === 'users') {
         if (usersPanel) usersPanel.classList.remove('hidden');
         if (crmPanel) crmPanel.classList.add('hidden');
@@ -6344,7 +7186,7 @@ async function loadAdminCrmData() {
     const token = localStorage.getItem('deept_token');
     const tableBody = document.getElementById('crmJobsTableBody');
     if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-sm" style="color:var(--text-muted);">در حال بارگذاری داده‌های CRM...</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-sm" style="color:var(--text-muted);">در حال بارگذاری داده‌های CRM...</td></tr>`;
     }
     
     try {
@@ -6361,7 +7203,7 @@ async function loadAdminCrmData() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) {
-            if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در بارگذاری داده‌های CRM.</td></tr>`;
+            if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در بارگذاری داده‌های CRM.</td></tr>`;
             showToast('خطا در بارگذاری داده‌های CRM');
             return;
         }
@@ -6372,7 +7214,7 @@ async function loadAdminCrmData() {
         updateCrmDashboard();
     } catch (e) {
         console.error(e);
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال به سرور.</td></tr>`;
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-sm" style="color:var(--text-muted);">خطا در اتصال به سرور.</td></tr>`;
         showToast('خطا در ارتباط با سرور.');
     }
 }
@@ -6525,34 +7367,45 @@ function updateCrmDashboard() {
     
     const profitMonthly = completedMonthly.reduce((sum, j) => sum + (j.price_toman || 0), 0);
     const failureRateMonthly = totalMonthly > 0 ? ((failedMonthly.length / totalMonthly) * 100).toFixed(1) : '0';
+    // Only completed jobs get an api_cost_usd today (set once extraction
+    // finishes -- see DeepT-Core's PATCH /jobs/{job_id}); a job predating
+    // this field, or whose document type doesn't track cost yet, is null
+    // and contributes 0 rather than breaking the sum.
+    const apiCostMonthly = filteredForStats.reduce((sum, j) => sum + (j.api_cost_usd || 0), 0);
 
     // Dynamic labels — beside همهٔ زمان‌ها concept
     const profitLabelEl = document.getElementById('crmStatProfitLabel');
     const profitSubEl = document.getElementById('crmStatProfitSub');
     const workLabelEl = document.getElementById('crmStatWorkLabel');
     const failureLabelEl = document.getElementById('crmStatFailureLabel');
+    const apiCostLabelEl = document.getElementById('crmStatApiCostLabel');
+    const apiCostSubEl = document.getElementById('crmStatApiCostSub');
     if (profitLabelEl) profitLabelEl.textContent = label === 'همهٔ زمان‌ها' ? 'سود بازه انتخابی (تومان)' : `سود ${label} (تومان)`;
     if (profitSubEl) profitSubEl.textContent = label === 'همهٔ زمان‌ها' ? 'جمع پرداختی کارهای موفق — همهٔ زمان‌ها' : `جمع پرداختی کارهای موفق — ${label}`;
     if (workLabelEl) workLabelEl.textContent = label === 'همهٔ زمان‌ها' ? 'تعداد کل کارها' : `تعداد کل کارهای ${label}`;
     if (failureLabelEl) failureLabelEl.textContent = label === 'همهٔ زمان‌ها' ? 'نرخ ناموفق' : `نرخ ناموفق ${label}`;
-    
+    if (apiCostLabelEl) apiCostLabelEl.textContent = label === 'همهٔ زمان‌ها' ? 'هزینه API (دلار)' : `هزینه API ${label} (دلار)`;
+    if (apiCostSubEl) apiCostSubEl.textContent = label === 'همهٔ زمان‌ها' ? 'مجموع هزینهٔ واقعی Gemini — همهٔ زمان‌ها' : `مجموع هزینهٔ واقعی Gemini — ${label}`;
+
     document.getElementById('crmStatProfit').textContent = profitMonthly.toLocaleString();
     document.getElementById('crmStatWorkCount').textContent = totalMonthly.toLocaleString();
     document.getElementById('crmStatWorkDetails').textContent = `موفق: ${completedMonthly.length.toLocaleString()} | ناموفق: ${failedMonthly.length.toLocaleString()}`;
     document.getElementById('crmStatFailureRate').textContent = `${failureRateMonthly}%`;
+    document.getElementById('crmStatApiCost').textContent = `$${apiCostMonthly.toFixed(2)}`;
     
     // Build per-document-type aggregation for the SELECTED time-frame (global)
     const docTypeStats = {};
     Object.entries(DOCUMENT_REGISTRY).forEach(([key, doc]) => {
-        docTypeStats[key] = { label: doc.label, total: 0, completed: 0, failed: 0, revenue: 0 };
+        docTypeStats[key] = { label: doc.label, total: 0, completed: 0, failed: 0, revenue: 0, apiCost: 0 };
     });
-    
+
     filteredForStats.forEach(j => {
         const t = j.document_type;
         if (!docTypeStats[t]) {
-            docTypeStats[t] = { label: t, total: 0, completed: 0, failed: 0, revenue: 0 };
+            docTypeStats[t] = { label: t, total: 0, completed: 0, failed: 0, revenue: 0, apiCost: 0 };
         }
         docTypeStats[t].total++;
+        docTypeStats[t].apiCost += (j.api_cost_usd || 0);
         if (j.status === 'completed') {
             docTypeStats[t].completed++;
             docTypeStats[t].revenue += (j.price_toman || 0);
@@ -6574,7 +7427,7 @@ function updateCrmDashboard() {
     const tableTbody = document.getElementById('crmDocTypeSummaryTableBody');
     if (tableTbody) {
         if (activeTypes.length === 0) {
-            tableTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4" style="color:var(--text-muted);">داده‌ای وجود ندارد.</td></tr>`;
+            tableTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4" style="color:var(--text-muted);">داده‌ای وجود ندارد.</td></tr>`;
         } else {
             tableTbody.innerHTML = activeTypes.map(([key, s], idx) => {
                 const share = grandTotal > 0 ? ((s.total / grandTotal) * 100).toFixed(1) : '0.0';
@@ -6589,6 +7442,7 @@ function updateCrmDashboard() {
                         <td class="py-2 px-1 text-center en" style="color:#f87171;">${s.failed.toLocaleString()}</td>
                         <td class="py-2 px-1 text-center en font-bold" style="color:var(--accent);">${share}%</td>
                         <td class="py-2 px-1 text-center en" style="color:var(--text-muted);">${s.revenue.toLocaleString()}</td>
+                        <td class="py-2 px-1 text-center en" style="color:var(--text-muted);">$${s.apiCost.toFixed(2)}</td>
                     </tr>
                 `;
             }).join('');
@@ -6677,7 +7531,7 @@ function applyCrmFilters() {
     if (!tbody) return;
     
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-sm" style="color:var(--text-muted);">هیچ کاری با مشخصات فیلتر شده یافت نشد.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-sm" style="color:var(--text-muted);">هیچ کاری با مشخصات فیلتر شده یافت نشد.</td></tr>`;
         return;
     }
     
@@ -6696,6 +7550,12 @@ function applyCrmFilters() {
         return 'background:#9ca3af; color:#000;';
     };
     
+    // Not every document type tracks api_cost_usd yet, and a job predating
+    // that field has none -- shown as "—" rather than $0.0000.
+    const apiCostCell = (j) => j.api_cost_usd != null
+        ? `$${j.api_cost_usd.toFixed(4)}`
+        : '<span style="color:var(--text-muted);">—</span>';
+
     tbody.innerHTML = filtered.map(j => {
         const errMsg = j.error_message ? escapeHtml(j.error_message) : '—';
         const dateStr = (j.created_at || '').slice(0, 10) + ' ' + (j.created_at || '').slice(11, 16);
@@ -6710,6 +7570,7 @@ function applyCrmFilters() {
                 </td>
                 <td class="py-2 px-2 text-center en" style="color:var(--text-muted); font-size:0.8rem;">${dateStr}</td>
                 <td class="py-2 px-2 text-center font-mono" style="color:var(--text-main);">${(j.price_toman || 0).toLocaleString()}</td>
+                <td class="py-2 px-2 text-center en font-mono" style="color:var(--text-main);">${apiCostCell(j)}</td>
                 <td class="py-2 px-2 en text-right" style="color:var(--text-muted); font-size:0.85rem;" dir="ltr">${escapeHtml(j.original_filename)}</td>
                 <td class="py-2 px-2 text-xs text-red-400 max-w-xs truncate" title="${errMsg}" style="color: #fb7185;">${errMsg}</td>
             </tr>
@@ -6780,13 +7641,10 @@ function toggleTheme() { toggleGlobalTheme(); }
 
 // ── INIT ──
 // SECONDARY INIT — runs after initializeApp(); only handles things that
-// don't belong in the primary init block (hero logo, CRM selects).
+// don't belong in the primary init block (CRM selects).
 // Theme restore, test session, syncUserSessionDOM, activation redirect
 // and routing all live in initializeApp() and must NOT be duplicated here.
 (function(){
-    // Set hero logo
-    const heroLogo=document.getElementById('heroLogo');
-    if(heroLogo) heroLogo.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABDgAAAQ4CAYAAADsEGyPAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAALQRJREFUeNrs3f111MbeB/C59/B//FQQ3QriVMBSQUwFLBUEKsBUYFKBlwogFSAqiKkgmwriWwGPJtJeHMcvq129jGY+n3PmLJjF0v4k50RfZn4TAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFP6lxIAMKJVN3JRZ/RZrppx7RYFAHIh4ABgTOfNeKMMjGzbjVLEYOrLra/dDKxqtwQAJXqiBADAwlXdKMnZHu/Z3hh/hDYE2XavAJAdAQcAQJ6qcH/wsws74kyQOliyBEAGLFEBYEznwRIVWIptaMOOm6EHACyGGRwAAERVM9Y3fh9ndNTN+NyMj6GsPicALNC/lQAAgDuchLbXx0Uzfu/GZdiv/wcATE7AAQDAPqrQzvD40Iw/u9f4+xOlASAFAg4AAPraze6IMzpuhh0AMBsBBwAAx7oZdsTXlZIAMDUBBwAAQ4kzO9bN+BTanh3n4f6tagFgUAIOAADGUIV2m+gYdMQlLCslAWBMAg4AAMYWl7DsZnWsg8akAIxAwAEAwFSq0Pbo2C1fEXQAMBgBBwAAU4vBRly+smtKWikJAMcScAAAMKd1aGd0CDoAOIqAAwCAFKyDoAOAIwg4AABIyToIOgA4gIADAIAUrZvxW9CMFIA9CTgAAEjVrhnpbntZALiXgAMAgNTFoGO3vexKOQC4i4ADAIClqJrxqRkfgv4cANwi4AAAYGnOwrf+HADwFwEHAABLtOvPEYOOlXIAIOAAAGDJTkO7bOUi2G0FoGgCDgAAcvAqmM0BULQnSgBAJupmfFYGBr6nbrtqxvUjfy/OIji94+s3H7y/D9+aZHogH06saZzN8a4Zb/e4VgAAAHs5b8bXica5crNwMRRZNWPd3c8fuof1r8ZBw5ayAIUxgwMAIA1XD/xZ1Y34wP5D9+tTJXtQrFEMiOJMjnPlAMifgAMAIH3bbtS3vr4KbdDxQ/frSqn+Ie608lMznnc1BCBTAg4AgOWqw99Djyq0gcfT8C38oK1DbED6uhkb5QAAAPo6D3pwwJyq0Pb0uGzGn0Ffjq9dLWwnCwAACDhgwU67n5XfCg854uev3A4Aefm3EgAAFCM2Mj1vxo/N+E9ol2x8LLAOuyUrZ24JgHwIOAAAyrRtxrvQNt/8v2a8DGWFHXGZStyK99ytAJAHAQcAANehbb4Zw47dzI6rQj573GUlBh36cgAsnIADAICbtqGd2fFjN+KvrzP/zHGpyqegLwfAogk4AAC4T5zFEWdz7Jaw1Bl/1l1fDlvrAiyUgAMAgH1smvEstEtYcp3VEZepxJkca5cbYHkEHAAA9LEN7ayOGHS87H6fkxhyXAYhB8DiCDgAADjErjFpDDrizI46s88XQ44LlxlgOQQcAAAcqw5tyBFHTlvNvgpt0AHAAgg4AAAYSh2+bTW7yeQzrYOQA2ARBBwAAAxtG9r+HDHoyGFGxzoIOQCSJ+AAAGAs29DO6MihR8c6tNvInrisAGkScAAAMLY6tCFHDDu2C/4cp8344HICpEnAAQDAVOJylbhsJW4ze73Qz7AKlqsAJEnAAQDA1N6FZTciXQchB0ByBBwAAMwhzuCIjUjj0pWrBZ7/Ogg5AJIi4AAAYE51M35sxtsFnvu6GecuIUAaBBwAAKTgPLTLVuqFnfeb0AYdAMxMwAEAQCq2oV2ysrQmpHGpysrlA5iXgAMAgNTEJqRL680Rt489dekA5iPgAAAgRTHcWFJvjpPQhhwnLh3APAQcAACk7Dy0szmWsGSlasYnlwxgHgIOAABSV4flNCCNy1RsHwswAwEHAABLEGdwxJkcS1iysg52VgGYnIADAIAlOQ/LWLISZ3FoOgowIQEHAABLU4e2AWnqu6xoOgowIQEHAABLtA3tTI5NwudYBf04ACYj4AAAYKniMpWXIe2+HGfNeOVSAYxPwAEAwNKdhzboSNVF0I8DYHQCDgAAcrAJbV+OVJuPxqUq+nEAjEjAAQBALmLT0VR3WIkzON64RADjEXAAAJCTGHL8J6S5w0rsxbFyiQDGIeAAACA3cQZHnMmRYshh61iAkQg4AADIUaohRww3bB0LMAIBBwAAuYohR2w8uknsvM66AcCABBwAAOQubiG7Seyc4taxlqoADEjAAQBACVILOapgVxWAQQk4AAAoRWohh11VAAb0RAkAIEkrDz7FuurGVilG8bJ7XSdyPnGpyo8uC8DxBBwAkKZVMH29dNvQBh2fm1GHNLc8XarXzTjtxtziOcSZHO9cFoDjWKICAJCmKrQ7bcR/4f+tGb+HdnvR+DXNKY+T2hayb1xTgOMJOAAAlqEK7bKKD834s3tdezA+WEohR7yGFy4JwHEEHAAAyxRncsQZHTfDDvrZhRzXCZxLvH4rlwTgcAIOAIDluxl2xNdTJdlbSiGHvjsARxBwAADkIy51WIe2Z8dvwayOfcVlKs8SOI+VawZwOAEHAECe4iyOOJsjNic9D3p1PCaGHC8TOA+zOAAOJOAAAMhb1T00Czoet2nG2wSu1yuXAqA/AQcAQBlisCHoeFyszWbmc7BtLMABBBwAAGURdDzudZh3+9h4TcziAOhJwAEAUKZd0KEZ6T+lsLPKz0H4BNCLgAMAoGxVaJuRfgq2l71pF3LMxSwOgJ4EHAAARKvQzua4CGYO7My9s4pZHAA9CDgAALgpzhqI/TnOlOIvmzBf01GzOAB6EHAAAHDXg/WHbphBMG/TUbM4APYk4AAA4D5xFofZHG0/jpdhnqajJ+oPsB8BBwAAjz1gx5kcl6HsmQRxBsfrmY79xm0I8DgBBwAA+1gHO61swjz9OKpgK1+ARwk4AADYVww3fiv8YTvO4tjOcNwXbj+Ahwk4AADo6zKUu2Ql9uF4PsNxV90A4B4CDgAADrEO7ZKVqsDPHvtxvJ3huGZxADxAwAEAwKF2S1ZK7Mtx3ox64mOugy1jAe4l4AAA4BjxgbvUvhxzbB37yi0HcDcBBwAAQ7gs8OF7G6ZfqmKZCsA9BBwAAAzlIrRBR0nehWmXqlRBs1GAOz1RAgAoXnw4+6wMs/u+e3CtFv451t3ry4KuXfyscZnOVP0xXoTp+38AAEDRzpvxdaJxrnZql4mqCwniTIg/J7wPhh6X/ns36tBsFOAWS1QAANKybcYmtLMC/q8ZP4Z2GcR2YZ9jHdptZEt5ED8P7faxUznzowLwdwIOAIC0xYfm1834TzOehzb8WIpVMz4UdK2mXJbzsx8NgL8TcAAALMfH7iE6hh1x947rBZzzKpSzXCWGUe8mOtZpWH6/FoBBCTgAAJZnG9olEUsJOtahnJBjyuthmQrADQIOAIDlig/S52EZQcc6lBFyxGvweqJjvfAjAPCNgAMAII+H6vPQBh2bhM9z3YxXBVyPeA3qCY5jmQrADQIOAIB8xKAj9uh4Fqbd0aOPi9AGHbmbahaHZSoAHQEHAEB+6tBuL/s20fOLIcdp5tcgBkybCY5jmQpAR8ABAJCv89AGHdvEzuukGZ+615zFWRxj90U5LaCOAHsRcAAA5C3OJIghxyax89qFHDmL4cYvExzHMhWAIOAAACjBrjfH68TOK84+uMi89u/C+LM4nrrFAQQcAAAliQ/bz0Ja28nGXVVynoEwxbaxZnAABAEHAEBp6tCGHNuEzuky5L3d6WbkesflPqdubaB0Ag4AgPLs+nKkspVsfED/kHnNx97RxiwOoHgCDgCAMsWlE3EmRyohR5yBcJ5xvTdh3Fkc+nAAxRNwAACUK7WQ403Ie6nFmLM4Vm5noHQCDgCAsqUWclxmXOtNGHcWx8rtDJRMwAEAQEohR+5LVcziABiJgAMAgCilkCMuVakyrfMmjDeLQx8OoGgCDgAAdmLI8bJ7nVvOS1XGmsVhq1igaAIOAABuijM4niVwHqtmrDOt8SaMEyLF7XaFHECxBBwAANwWQ46XCZzHm+6hPUe/jPR9BRxAsQQcAADcZdOMdzOfQ9WMVxnXdww/uHWBUgk4AAC4z+tmfJz5HH4OeTYc3YZxQg4zOIBiCTgAAHjIyzDerh/7iEtU3mRa219H+J4rtyxQKgEHAAAPic0wn898DuuQ5yyOODtmO8L3rdy2QIkEHAAAPCY2HX098znkOotjjCVAlqkARRJwAACwj9hwtJ7x+OuQ58yE9yN8TwEHUCQBBwAA+4pLVa5nPH6Oszji7JjtwN/TTipAkQQcAADsK4Ybcy5VWYd8e3EM6cStCpRIwAEAQB+bMO9SlRxncQy9TGXlNgVKJOAAAKCvlzMe+yzkN0NhjGUqZnEAxRFwAADQV3wYfzvTseOD+6sMazr0MhWNRoHiCDgAADhE3FVlO9OxX2RYz18H/n5mcADFEXAAAHCI2HB0rlkcVWiXquSkDsPuUGMGB1AcAQcAAIfahLZ/xBxynMXx0S0FcDgBBwAAx5hr29g4g6PKrJafB/xeT92aQGkEHAAAHKMO820bu86wlgAcSMABAMCx5urFkdsylW0YbslP5bYESiPgAADgWHWYZ/ZBfIg/zbCWQ9UGoCgCDgAAhvDLTMfNbRbHZ7cSwGEEHAAADCHuALKd4bg5bhc7lBO3JVASAQcAAEOZoxdHFfJapnIdhuvDceqWBEoi4AAAYCgfuwf0qeW2TOXKrQTQn4ADAIChxHBjM8Nxc1umog8HwAEEHAAADGmOZqNVyGvXEDM4AA4g4AAAYEjbMM+WsTnN4hgq4KjcjkBJBBwAAAzt/QzHfJpZDesBvkflVgRKIuAAAGBoczQbXWVWQ8tUAHoScAAAMLQYbnyc+JgnIa+Q44vbCKAfAQcAAGP4dYZjrjKq39YtBNCPgAMAgDHMsUzlh4zqV7uFAPoRcAAAMJapl6msMqvf1i0EsD8BBwAAY/k88fFiH44qo/pt3UIA+xNwAAAwlo8zHHOVUf3spALQg4ADAICxXM/wkF5lVL//uoUA9ifgAABgTPXEx3uqdgBlEnAAADCmqftwnGZUu2u3D8D+BBwAAIxpO/HxTrqRg2OX99RuP6AkAg4AAFJ+SD/EqbIDlEfAAQDA2LYTH6/KqHa12wdgPwIOAADGtp34eJWSA5RHwAEAwNimbpb5fUa127p9APYj4AAAYGxfJj5elVHt/jji79ZuPaAkAg4AAABg8QQcAACQrmslANiPgAMAAA/p6bqa+O8BLJaAAwCAVB/SOZxQCSiOgAMAAABYPAEHAAC5qZQgfFYCoDQCDgAAclNl9Fks7wHYk4ADAADSdWgvDcEIUBwBBwAA5EeTUaA4Ag4AADxs58cMDqA4Ag4AADxs50eoBBRHwAEAAHmplQAokYADAADyYvYGUCQBBwAA5OWLEgAlEnAAAEBetkoAlEjAAQAAedkqAVAiAQcAAOSlVgKgRAIOAABytCr0c29deqBUAg4AAMjHlRIApRJwAABAuk57vt8OKkCxBBwAAJCuk57vr5UMKJWAAwAA8mGJClAsAQcAAORh24xrZQBKJeAAAGCqh2/667NExewNoGgCDgAAprBVgoP0aTKqwShQNAEHAADkoVYCoGQCDgAAyEOtBEDJBBwAAJCup3u+r1YqoHQCDgAAWD4NRoHiCTgAACBd1Z7v+6xUQOkEHAAAkK5qz/fVSgWUTsABAADLFpenXCsDUDoBBwAApGm15/t+VSoAAQcAACxdrQQAAg4AAEjVao/3xKUptVIBCDgAACBV3+3xnlqZAFoCDgAASNPpHu+xPSxAR8ABAECOcthVpNrjPR9daoCWgAMAgBxdZfAZqj0+49alBmgJOAAAmIIH8X72WZ5SKxPANwIOAACm8IcS9FLt8Z73ygTwjYADAADS89gMjm3IYxkOwGAEHAAAkJ4fHvlzzUUBbhFwAABAeh6bwWF5CsAtAg4AAEhP9cCfbYPlKQD/IOAAAIC0rB75c8tTAO4g4AAAgLRYngJwAAEHAACk5aEGo9tgeQrAnQQcAACQlodmcJi9AXAPAQcAALlZ8gyHk/BwwLFxeQHuJuAAACA31ws+94fCjRjcbF1egLsJOAAAIB2rB/7sF+UBuJ+AAwAA0vH0gT+zPSzAAwQcAACQjvuWqGzCspfeAIxOwAEAAGmI4cbJPX9m9xSARwg4AAAgDat7vr5tRq08AA8TcAAAkJvtQs/7vv4bmosC7EHAAQDAFH6Y8Fh/LLRGqzu+FvtubNw+AI8TcAAAMIUTJXjQff034s4pmosC7EHAAQAA8zu75+uWpwDsScABAADzu6v/Rt2MK6UB2I+AAwAA5hWXpqzu+LrZGwA9CDgAAMjN0mY9rO742ja0/TcA2JOAAwCA3CytKedPd3ztrcsI0I+AAwAA5nW7wWgMaMzeAOhJwAEAwBQqJbjTXdvDxt4btoYF6EnAAQDAFColuNOLW7+PwcY7ZQHoT8ABAEBu6gWd6+3lKXFpitkbAAcQcAAAwDzi8pTq1tc0FwU4kIADAADmcXv2xia028MCcAABBwAAYztVgjvd3h7W7A2AIwg4AAAY28mEx9oupCan4e/BzyaYvQFwFAEHAAA52S7kPG/vnmL2BsCRBBwAAIztRAn+4Wb/jU0wewPgaAIOAADGpgfHP+tR3fi92RsAAxBwAACQk6sFnOPPN34dw42tywZwPAEHAABj+27CY/13AfXYLU+5bsY7twfAMAQcAACMzRKVb2K4setJ8ktoQw4ABiDgAACA6ex2T9kGszcABiXgAABgbFPO4KgTrkMVvi1Pib03zN4AGJCAAwCAsdkmtrXuXuvQbg0LwIAEHAAAjEn/jW92y1NsCwswAgEHAABjmnr2RqrbxK5Cu0RlE9JeRgOwWAIOAADGNPUMjlT7Wrzozs3sDYCRCDgAABjT90rw18yNdWi3hd0qB8A4BBwAAIxpyhkc20RrsO7O7dztADAeAQcAAGMScLTLU166FQDGJeAAAGAsJ8EWsevQNhWt3Q4A43qiBAAAjGTqBqPbBGvwUzB7A2ASZnAAADCW1cTH+yPBz/8+pLuzC0BWBBwAAIzlByUIH5UAYBoCDgAAxrIq/PPXbgGA6Qg4AAAYQ+y/caIMAExFwAEAwBhWMxyzVnaAcgk4AAAYwwslAGBKAg4AAIZWhem3iI2ulB6gXAIOAACGdjbTcW3HClAwAQcAAEObY3lKrewAZRNwAAAwpFWYZ3nKVukByibgAABgSHM1F/1D6QHKJuAAAGAoVTPWMx27Vn6Asgk4AAAYypsZj20HFYDCCTgAABhC7LuxnunYMdywgwpA4QQcAAAM4WLGY9fKD4CAAwCAY626MZfPLgEAAg4AAI51OfPxP7oEAAg4AAA4xnlod0+Zi3ADgL8IOAAAOFTVjJ9nPodfXQYAIgEHAACHiktTTmY+BzM4APiLgAMAgEO8CvM2Fo1iuGF7WAD+IuAAAKCvqhlvEjiP9y4FADsCDgAA+voQ5l+asg2WpwBwg4ADAIA+LppxmsB5mL0BwN8IOAAA2NdZaHtvpGDjcgBwk4ADAIB9xFkbl4mcyya0S1QA4H8EHAAAPCb220hhS9idty4JALcJOAAAeEwMN04TOZdNMHsDgDsIOAAAeEgMN84SOh+zNwC4k4ADAID7xIai64TOZxPM3gDgHgIOAADusg7tlrCpuA5mbwDwAAEHAAC3rUM6O6bs/BLM3gDgAQIOAABuWof0wo2rZpy7NAA8RMABAMDOOqQXbsSlKc9dGgAeI+AAACBah/TCjehlsDQFgD0IOAAAWIc0w43YVPSjywPAPp4oAQBA0WKwsU7wvDZB3w0AejCDAwCgTCch3XAjNhV97RIB0IcZHAAA5YnhxqdmnCZ4bjHceBba5qIAsDczOAAAyhJDjd9DmuFGDDVeBuEGAAcQcAAAlGPdjN9CO4MjNTHUiDM3rlwmAA4h4AAAyN+u38Zloucn3ADgaHpwAADkLS5FuQxpLkmJhBsADMIMDgCAfL0K7ZIU4QYA2TODAwAgP7slKWcJn6NwA4BBmcEBAJCXGGr8HtION2Ko8WMQbgAwIDM4AADysIRZG1EMNeLMDVvBAjAoMzgAAJZvHdKftRFtQjtzQ7gBwOAEHADk4nsloECxeein0M7cOEn8XF8346VLBsBYLFEBIBeVElCQGGZchHbmRuribI3nzahdNgDGJOAAAFiOGGzErV9/DunP2Ijq0IYblqQAMDoBBwBjmnLZyFa5ydjSgo0YaLxtxjuXDoCpCDgAGFM14bH+UG4ytLRgI6pD22tj6/IBMCUBBwC5uFKCox5ISUsV2lBjHZYTbGxD20j0o8sHAADkJu7u8HWicZJZ7c4nrB3pWDXjw4TXfojxZ3e/nrh8AMzJDA4AxjTVA08dNDE81EYJZlc14yy0MzaqBd4/sdfG1mUEAAByNtW/IK8zrN35RLU7c5vO4qS7b5c2W2M3LoOtmQEAgEKcTvSg9Xum9TtXO6GGYAMA9meJCgBjBhxTeKvUapewGAbEWTJPw3Jny8TlX7+EdjnK1iUFAABKE/+ld+x/Tf6kfmqXoFUzLprxW1juTI2v3fmvXU4AAKB0f4bxd26oMq7f2DvQnLpFBxNr+Sose+nJzZ+rC/cHAABAax00xzzW7yPW7pVb9ChVd49fhvGDvKnGh6DhLAAAwKQP57numnL7AXrMJpH0s5uhcTnBvT11qBF/lk5cYgAAgH9ah/F3ccjdK7WbTRXamQznoV0mlMsMjd3yk8vu8wk1AAAAHnAy8gNhKUsrxmhOKdz4p9OMw4ybjULPg54aAAAAvcKNMXeNWBdSx7MRanchyPhfkHEZxm/gOnegcRHM0gCgQP9SAgAGCjfiev7VCN9724znzbgqpI7xAbUa6PtdN+NlMz4WEGCcdHWL4/vu9bSAh/y6+9n43P362n+OACjVEyUA4EjxQfJDGGcK/MfuAb2Uh7bLMFy4EWv3OrQB0VKc3HEfVTdq8t2NPz8J5S27uOrGl+619p8fAACAYR5Gz8M4fQvi9zwrrJYfBqpdXH6xmvj847XKaXeRFEa8jjHwejXD9QQAAChCNWKwsesXUVLvgNUA4cBud4w5H4RPw7dmnQKK/kHGeXf9Kv+JAYDD6MEBwD5i4LBuxoswzrKAuAQlLql4G5a1pOLYmu627OzrqqvTru9Civ1JTrsRH9ifhjKXlOzu7d31+qN73XZf0y8DAAYk4ABgH3FWxdBbtNY3HtBrNX30wfjqxoPxklW3xs2+GktrCnozpPjcvW67cR3KaIwLAMkQcACwj90Mjqfh27/K7+P6xkPgl4we0ody1wP97gFZbb7V5q7ZH9+H4ZdzxLr/8cj1MPMCABIl4ADgUPctOfAv1wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwCj+pQQAzKjqxs7qjvc8PeL7f77x6203onqBtVot6Fyvm3FVyGcd+n66+dlPm3EywM9DvB5fbl2bY6/RY0668y/F2PUEYA8CDgCm8ql7rcLfQ425H0x3D39X3dgmWr+vC3vgf1bIZz32/6c+zfwzsbvvv3TXbaiH9NWNn/kSHHvPAwAAC/J1IeP3ZnxoxjqkE8QsqX5fB3iw/bqwkdNn/bMZl804GyDg+FrQ+OQ/8QAAIOBIffzWjIsEwg4Bh4BjjrDjPPxzmYyAQ8ABkKR/KwEAPCj2EXgV2pkdMexYKwmFiMHGm+7ePw+HBR0AMBkBBwDsL4Ydcfr+Mf+yDUuzCzpiwLdSDgBS9UQJAEhQ3b3udkE5ZIeCm7s4/HDj90OEErsHvhfNeNuMjUvGyK67++y/4e87Au1j1b3GHViqcPhyq/j34lKMl+55AFJkFxUAprJvr4I6jLsbQXxIO+3G0zDMv0jX3UPfNoH6xSDodQIP41eFfNbd9V/Sz0XV3fc/hcObiT4WckyxTexFj2M8S/yeBwAAFiTVZn0n3UPebunJMQ0Zzwqsn8+67M9ahXa51SH3/tnMtfsUpmkECwAAsLiH1hh2rEPbVPHQoOPcQ7/PusDPWvUMDHah3px9aAQcAACAh9Y9HBN0XKqfz7rQz3qZwL0u4AAAADzIjSBuEXvI9P1L9fNZF/pZ+4YclYADgBTYJhYAHvYutA0K+zYQXIfxlqvAmPo2zD1TMgBSIOAAgMfFcCOGHJuef++Nhz8W6m2P9/6kXACkQMABAPuJ20A+tjXmXeJ0/xPlY2E23T2/j5VyAZACAQcA9BNDjrrH+2O4caFsLNBVz/scAGYl4ACA/p6Hfj0K1mG+RoxwqM893nuqXADMTcABAP3tlqv08UbZAADGI+AAgMPUzfjY4/3rYBYHy/Jdj/deKRcAcxNwAMDhXvd8vx1VWJI+y06ulQuAuQk4AOBw29Cv4egLJWMhYtPQ1Z7vNXsDgCQIOADgOO97vPc02G2CZegz26hWLgBSIOAAgOP0fbiz2wSpiyFcn6a4vyoZACkQcADAcbah35axKyUjcRdh/4a48d6vlQyAFAg4AOB4ehCQi8vQ7vizr7dKBkAqBBwAcLwvPd77dORzWTXj64xjSiV91rHFZSkfQr9wo27Gxo8/AKkQcAAAlG3djN9Dv8aicVvY50oHQEqeKAEAQHHijI11M34O+/fb2InhxrPuFQCSIeAAAMhfDDTiDj6rZvwUDt/NZxvamRv6zgCQHAEHAED6VqHt+1F3v4+zJx7q/fJd+BZixNeTAc4hHvt5MHMDgEQJOABgWh4OOcbqxq/PJrxnXwcNRQFInIADAI73fY/3fhn5XK66h9ESlPRZ5xCDjV+a8S4I5gBYAAEHAByv6vnQOPZDaV3QA3jt9htcDI5isPExCDYAWBABBwAcb9Xz4RFSE+/L96ENNbbKAcASCTgA4Dirnu+vlYyZbbvxubsfY7hhpgYAiyfgAIDj/NTjvWZvcKh477wNf9/e9Ydw/+4on2/8+jp8CzHcgwBkS8ABAMfps5PFe+XiQDGc+NgNAOAO/1YCADjYKvRrMOrhFABgJAIOADjcmx7vrYPmjQAAoxFwAMBh4tKUVY/3W54CADAiAQcA9BcbO170eP+2GRtlAwAYj4ADAPqL4UbV4/0vlQwAYFwCDgDo51Uz1j3eHxuL1soGADAuAQcA7G8d+i1NiVt7mr0BADABAQcA7CfO3Ljs+XeehzbkAABgZE+UAAAetGsouu759+LMjVr5AACmIeAAgPutQjtro+r59zbBrikAAJOyRAUA/qkKbbDxKfQPN94FfTcAACZnBgcAfHPajJ9D/+UoOzHY2CgjAMD0BBwAlC722DgLbbBxeuD3iI1EY0PRWjkBAOYh4ACgRKtuPO1ej/ExtDM37JYCADAjAQcAOVvdeP0+tP00VgN9720zXoc24EhJ/IzniZxLrNHGZwUApvAvJQBgIl8P+DtxVsRVz78Tl5mcjPwg+3aGh9mvC7zmdTOe+ayDfNZDv3/OYhPglf/nBWDHDA4AUnYShptxcawYtPwS/Cs9AECSBBwAcL9taJegvA/9Z5IAADAhAQcA/F0MMuog1AAAWBQBBwAl2/X4+By+BRt2QwEAWCABBwBTqcP4DUAfOnYUQ4z/dr/fdgMAgAzoKA3AnO4LPKpu9FHf+n0MM8zGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg/9mDQwIAAAAAQf9fO8MCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACcEmAAgAQSUp2yh2gAAAAASUVORK5CYII=";
 
     // CRM time-frame selects — init early so they are ready when admin opens CRM
     try { populateCrmTimeFrameSelects(); } catch(e) {}
