@@ -6,10 +6,9 @@
    / client-profile / admin-CRM, Sanam import, wallet+Shaparak, date tool,
    quick-start (no-signup), SPA routing (404.html redirect -> applyRouteForPath).
 
-   INTEGRATION CONTRACTS (do not change without a matching backend change):
-     This branch (backup-site) points at the isolated backup.deept.ir
-     deployment's own backend/core, kept separate from production so this
-     site never touches real production data or load:
+   This branch (backup-site) points at the isolated backup.deept.ir
+   deployment's own backend/core, kept separate from production so this
+   site never touches real production data or load:
      CORE            -> https://core-backup.deept.ir  (auth/wallet/jobs/clients/invoices)
      BACKEND         -> https://backend-backup.deept.ir (translation + passport)
      X-Service-Secret -> INTERNAL_SERVICE_SECRET (service-to-service, BackEnd side)
@@ -52,6 +51,11 @@ const DOCUMENT_REGISTRY = {
         endpoint: `${BACKEND}/api/translate/notary-deed`,
         active:              true,
         usePassportSession:  true,
+        // Notary deed scans run large (multi-page, high-res) and were
+        // failing after all 3 direct-upload attempts with no fallback
+        // (DeepT-Back-End now accepts upload_id here too -- see
+        // notary_deed.py's handle_notary_translation).
+        chunkedUpload:       true,
     },
     'academic-transcript': {
         label:               'ریزنمرات علوم پزشکی',
